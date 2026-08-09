@@ -153,7 +153,7 @@ const releaseRulesets = [
   { name: "Release tag immutability", target: "tag", include: [
     "refs/tags/zergchat-preview-v*", "refs/tags/zergchat-v*",
   ], exclude: [], bypass: [], rules: ["deletion", "update"] },
-];
+].map((ruleset) => ({ enforcement: "active", ...ruleset }));
 
 const sourceRulesets = [
   { name: "Development branch authority", target: "branch",
@@ -174,7 +174,7 @@ const sourceRulesets = [
   { name: "Desktop release tag immutability", target: "tag",
     include: desktopTags, exclude: [],
     bypass: [], rules: ["deletion", "update"] },
-];
+].map((ruleset) => ({ enforcement: "active", ...ruleset }));
 
 function rootReleaseDataEntries() {
   return [
@@ -457,12 +457,16 @@ test("every ruleset identity, reference, bypass, and rule is exact", () => {
       ? "ruleset-contract"
       : "source-ruleset-contract";
     for (const index of idealState()[owner].rulesets.keys()) {
-      for (const field of ["target", "include", "exclude", "bypass", "rules"]) {
+      for (const field of [
+        "enforcement", "target", "include", "exclude", "bypass", "rules",
+      ]) {
         const state = idealState();
         const value = state[owner].rulesets[index][field];
-        state[owner].rulesets[index][field] = field === "target"
-          ? (value === "branch" ? "tag" : "branch")
-          : value.length === 0 ? ["unexpected"] : [];
+        state[owner].rulesets[index][field] = field === "enforcement"
+          ? "evaluate"
+          : field === "target"
+            ? (value === "branch" ? "tag" : "branch")
+            : value.length === 0 ? ["unexpected"] : [];
         assert.deepEqual(errorCodes(state), [expectedCode], `${owner}/${index}/${field}`);
       }
       const missing = idealState();
@@ -475,6 +479,7 @@ test("every ruleset identity, reference, bypass, and rule is exact", () => {
     const state = idealState();
     state[owner].rulesets.push({
       name: "Unreviewed policy",
+      enforcement: "evaluate",
       target: "branch",
       include: ["~ALL"],
       exclude: [],
@@ -483,7 +488,7 @@ test("every ruleset identity, reference, bypass, and rule is exact", () => {
     });
     assert.deepEqual(
       errorCodes(state).filter((code) => code.endsWith("ruleset-contract")),
-      owner === "release" ? ["ruleset-contract"] : [],
+      [owner === "release" ? "ruleset-contract" : "source-ruleset-contract"],
       `${owner}/extra`,
     );
 
@@ -493,6 +498,36 @@ test("every ruleset identity, reference, bypass, and rule is exact", () => {
       owner === "release" ? "ruleset-contract" : "source-ruleset-contract",
     ], `${owner}/duplicate`);
   }
+
+  const unrelatedSource = idealState();
+  unrelatedSource.source.rulesets.push({
+    name: "Unrelated service branch history",
+    enforcement: "evaluate",
+    target: "branch",
+    include: ["refs/heads/unrelated-service"],
+    exclude: [],
+    bypass: [],
+    rules: ["deletion", "non_fast_forward"],
+  });
+  assert.equal(
+    errorCodes(unrelatedSource).includes("source-ruleset-contract"),
+    false,
+  );
+
+  const zergchatScopedSource = idealState();
+  zergchatScopedSource.source.rulesets.push({
+    name: "Dormant desktop exception",
+    enforcement: "evaluate",
+    target: "tag",
+    include: ["refs/tags/zergchat-v*"],
+    exclude: [],
+    bypass: [reviewerBypass],
+    rules: ["update"],
+  });
+  assert.deepEqual(
+    errorCodes(zergchatScopedSource),
+    ["source-ruleset-contract"],
+  );
 });
 
 test("repository-scoped release credentials are rejected independently", () => {
@@ -1325,11 +1360,29 @@ test("the collector normalizes settings through one injected HTTP boundary", asy
       read_only: true,
       key: testDeployPublicKey,
     }]],
-    ["Epoch-ML/zerg:rulesets", [{ id: 3 }]],
+    ["Epoch-ML/zerg:rulesets", [{ id: 5 }, { id: 3 }, { id: 4 }]],
     ["Epoch-ML/zerg:rulesets/3", {
       name: "Development branch history", enforcement: "active", target: "branch",
       conditions: {
         ref_name: { include: ["refs/heads/development"], exclude: [] },
+      },
+      bypass_actors: [],
+      rules: [{ type: "deletion" }, { type: "non_fast_forward" }],
+    }],
+    ["Epoch-ML/zerg:rulesets/4", {
+      name: "Development branch history", enforcement: "evaluate", target: "branch",
+      conditions: {
+        ref_name: { include: ["refs/heads/development"], exclude: [] },
+      },
+      bypass_actors: [],
+      rules: [{ type: "deletion" }, { type: "non_fast_forward" }],
+    }],
+    ["Epoch-ML/zerg:rulesets/5", {
+      name: "Unrelated service branch history",
+      enforcement: "evaluate",
+      target: "branch",
+      conditions: {
+        ref_name: { include: ["refs/heads/unrelated-service"], exclude: [] },
       },
       bypass_actors: [],
       rules: [{ type: "deletion" }, { type: "non_fast_forward" }],
@@ -1379,16 +1432,22 @@ test("the collector normalizes settings through one injected HTTP boundary", asy
       custom_branch_policies: true,
     },
   });
-  assert.deepEqual(state.release.rulesets, [{
-    name: "Reviewed release requests", target: "branch",
-    include: ["refs/heads/main"], exclude: [],
-    bypass: ["DeployKey:any:always", "User:1042757:always"],
-    rules: [
-      reviewedPullRequestRule,
-      "required_linear_history",
-      releaseStatusRule,
-    ],
-  }]);
+  assert.deepEqual(state.release.rulesets, [
+    {
+      name: "Reviewed release requests", enforcement: "active", target: "branch",
+      include: ["refs/heads/main"], exclude: [],
+      bypass: ["DeployKey:any:always", "User:1042757:always"],
+      rules: [
+        reviewedPullRequestRule,
+        "required_linear_history",
+        releaseStatusRule,
+      ],
+    },
+    {
+      name: "Inactive", enforcement: "evaluate", target: "branch",
+      include: ["~ALL"], exclude: [], bypass: [], rules: ["deletion"],
+    },
+  ]);
   assert.deepEqual(state.release.deployKeys, [{
     title: "feed key", verified: true, read_only: false,
     fingerprint: testDeployFingerprint,
@@ -1418,11 +1477,25 @@ test("the collector normalizes settings through one injected HTTP boundary", asy
       custom_branch_policies: true,
     },
   });
-  assert.deepEqual(state.source.rulesets, [{
-    name: "Development branch history", target: "branch",
-    include: ["refs/heads/development"], exclude: [],
-    bypass: [], rules: ["deletion", "non_fast_forward"],
-  }]);
+  assert.deepEqual(state.source.rulesets, [
+    {
+      name: "Development branch history", enforcement: "active", target: "branch",
+      include: ["refs/heads/development"], exclude: [],
+      bypass: [], rules: ["deletion", "non_fast_forward"],
+    },
+    {
+      name: "Development branch history", enforcement: "evaluate", target: "branch",
+      include: ["refs/heads/development"], exclude: [],
+      bypass: [], rules: ["deletion", "non_fast_forward"],
+    },
+    {
+      name: "Unrelated service branch history",
+      enforcement: "evaluate",
+      target: "branch",
+      include: ["refs/heads/unrelated-service"], exclude: [],
+      bypass: [], rules: ["deletion", "non_fast_forward"],
+    },
+  ]);
   assert.deepEqual(state.source.deployKeys, [{
     title: "source key", verified: true, read_only: true,
     fingerprint: testDeployFingerprint,
