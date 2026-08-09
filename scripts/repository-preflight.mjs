@@ -231,6 +231,14 @@ function sortedStrings(values) {
 }
 
 function equalStrings(left, right) {
+  if (
+    !Array.isArray(left) ||
+    !Array.isArray(right) ||
+    left.some((value) => typeof value !== "string") ||
+    right.some((value) => typeof value !== "string")
+  ) {
+    return false;
+  }
   const actual = sortedStrings(left);
   const expected = sortedStrings(right);
   return actual.length === expected.length &&
