@@ -212,7 +212,7 @@ describe("ZergChat source-build release contract", () => {
       ["Push the prepared release-data commit"],
     );
 
-    const stage = requireStep(feed, "Stage and commit only the channel-scoped v2 Pages feed");
+    const stage = requireStep(feed, "Stage and commit only the channel-scoped Pages feed");
     assert.doesNotMatch(JSON.stringify(stage), /secrets\.|ssh-key/);
     assert.match(stage.run, /https:\/\/github\.com\/\$GITHUB_REPOSITORY\.git/);
     assert.match(stage.run, /feed-policy\.mjs/);

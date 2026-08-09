@@ -1,9 +1,9 @@
 # Zergchat Releases
 
 This repository is the public distribution and updater trust boundary for the
-Zerg Development Environment (Zergchat). Private source remains in
+native ZergChat desktop application. Private source remains in
 **Epoch-ML/zerg**; this repository holds validated release requests, public
-artifacts, the independent updater public key, and GitHub Pages feeds.
+artifacts, independent channel updater public keys, and GitHub Pages feeds.
 
 ## Release flow
 
@@ -48,13 +48,13 @@ Updater feeds:
 - Preview: https://epoch-ml.github.io/zergchat-releases/preview/latest.json
 - Immutable metadata: CHANNEL/releases/VERSION.json
 
-The legacy root **latest-stable.json** and **latest-canary.json** files are
-preserved byte-for-byte. The old private updater key is unavailable, so
-existing 0.1.2 clients need one manual installation of a v2 release before
-channel updates can continue. Zergchat 0.2.0 and 0.2.1 desktop bundles also require
-one manual installation because their packaged frontend omitted the static
-entry document. Automatic channel updates resume after installing a corrected
-release.
+Legacy native releases through 0.1.8 were published from the private source
+repository. Their macOS update facade currently withholds the artifacts, their
+private GitHub download URLs are not anonymously usable, and those clients do
+not trust the new channel-specific roots in this repository. Every such
+installation therefore needs one manual installation of the first release
+from this public boundary. Automatic preview or stable channel updates begin
+only between releases that embed the corresponding new root below.
 
 ## Repository configuration
 
@@ -94,9 +94,9 @@ hosts: the publisher never enters **zergchat-feed**, and the feed promoter has o
 Preview and stable applications embed distinct updater roots:
 
 - [keys/zergchat-preview-updater.pubkey](keys/zergchat-preview-updater.pubkey), key ID
-  **F4EAB02A90B7A200**
+  **B560202AC690AEF3**
 - [keys/zergchat-stable-updater.pubkey](keys/zergchat-stable-updater.pubkey), key ID
-  **4EF2F352888FE49B**
+  **1E62C9A6F112AF0D**
 
 The stable feed can therefore never accept an archive signed by the preview
 identity, even if an ad-hoc preview app is otherwise valid.
@@ -132,6 +132,8 @@ material through release artifacts.
     npm ci
     npm audit --audit-level=moderate
     npm test
+    npm run test:mutation:collect
+    npm run test:mutation:payload
     npm run test:mutation:request
     npm run test:mutation:signing
     actionlint .github/workflows/release.yml

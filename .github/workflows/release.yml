@@ -1514,7 +1514,7 @@ jobs:
           fi
 
       - id: feed
-        name: Stage and commit only the channel-scoped v2 Pages feed
+        name: Stage and commit only the channel-scoped Pages feed
         shell: bash
         run: |
           set -euo pipefail
@@ -1528,26 +1528,11 @@ jobs:
               pages
           git -C pages config core.hooksPath /dev/null
           prepared_parent="$(git -C pages rev-parse HEAD)"
-          legacy_hash() {
-            if [[ -f "$1" ]]; then
-              sha256sum "$1" | cut -d ' ' -f 1
-            else
-              echo MISSING
-            fi
-          }
-          stable_before="$(legacy_hash pages/latest-stable.json)"
-          canary_before="$(legacy_hash pages/latest-canary.json)"
           node release-repository/scripts/feed-policy.mjs \
             "$CHANNEL" \
             "$VERSION" \
             "$PWD/release" \
             "$PWD/pages"
-          stable_after="$(legacy_hash pages/latest-stable.json)"
-          canary_after="$(legacy_hash pages/latest-canary.json)"
-          if [[ "$stable_before" != "$stable_after" || "$canary_before" != "$canary_after" ]]; then
-            echo "::error::Legacy root feeds changed; refusing to publish."
-            exit 1
-          fi
 
           while IFS= read -r status_line; do
             changed_path="${status_line:3}"

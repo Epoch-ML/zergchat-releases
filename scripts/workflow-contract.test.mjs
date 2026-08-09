@@ -336,7 +336,7 @@ describe("Zergchat release workflow contract", () => {
     const publicDownload = workflow.indexOf(
       "Download and verify canonical public release assets",
     );
-    const feed = workflow.indexOf("Stage and commit only the channel-scoped v2 Pages feed");
+    const feed = workflow.indexOf("Stage and commit only the channel-scoped Pages feed");
     assert.ok(create < upload);
     assert.ok(upload < complete);
     assert.ok(complete < publish);

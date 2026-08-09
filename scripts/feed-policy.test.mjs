@@ -14,8 +14,8 @@ afterEach(async () => {
   );
 });
 
-describe("Zergchat v2 feed publication policy", () => {
-  it("derives only channel-scoped v2 destinations", () => {
+describe("Zergchat feed publication policy", () => {
+  it("derives only channel-scoped destinations", () => {
     assert.deepEqual(feedDestinations("stable", "1.2.3"), {
       latest: "stable/latest.json",
       metadata: "stable/releases/1.2.3.json",
@@ -26,7 +26,7 @@ describe("Zergchat v2 feed publication policy", () => {
     });
   });
 
-  it("publishes v2 files without changing either legacy trust-root manifest", async () => {
+  it("publishes into an otherwise empty channel-scoped site tree", async () => {
     const root = await mkdtemp(join(tmpdir(), "zergchat-feed-policy-"));
     temporaryDirectories.push(root);
     const releaseDirectory = join(root, "release");
@@ -34,12 +34,8 @@ describe("Zergchat v2 feed publication policy", () => {
     await mkdir(releaseDirectory, { recursive: true });
     await mkdir(pagesDirectory, { recursive: true });
 
-    const stableLegacy = Buffer.from("legacy-stable-key-D748E6F223757FB4\n");
-    const canaryLegacy = Buffer.from("legacy-canary-key-D748E6F223757FB4\n");
     const manifest = Buffer.from('{"version":"1.2.3"}\n');
     const metadata = Buffer.from('{"source_sha":"0123456789abcdef0123456789abcdef01234567"}\n');
-    await writeFile(join(pagesDirectory, "latest-stable.json"), stableLegacy);
-    await writeFile(join(pagesDirectory, "latest-canary.json"), canaryLegacy);
     await writeFile(join(releaseDirectory, "latest.json"), manifest);
     await writeFile(join(releaseDirectory, "release-metadata.json"), metadata);
 
@@ -50,8 +46,6 @@ describe("Zergchat v2 feed publication policy", () => {
       version: "1.2.3",
     });
 
-    assert.deepEqual(await readFile(join(pagesDirectory, "latest-stable.json")), stableLegacy);
-    assert.deepEqual(await readFile(join(pagesDirectory, "latest-canary.json")), canaryLegacy);
     assert.deepEqual(await readFile(join(pagesDirectory, "stable", "latest.json")), manifest);
     assert.deepEqual(
       await readFile(join(pagesDirectory, "stable", "releases", "1.2.3.json")),
