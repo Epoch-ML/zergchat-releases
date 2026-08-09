@@ -159,6 +159,7 @@ const EXPECTED_SOURCE_RULESETS = Object.freeze([
     rules: Object.freeze([
       "pull_request:rebase:1:last-push",
       "required_linear_history",
+      "required_status_checks:Protected-base ZergLang release policy:15368:strict",
       "required_status_checks:Protected-base ZergChat release policy:15368:strict",
     ]),
   }),
