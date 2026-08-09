@@ -655,6 +655,49 @@ test("every ruleset identity, reference, bypass, and rule is exact", () => {
   }
 });
 
+test("source wildcard scoping requires one anchored product tag namespace", () => {
+  for (const include of [
+    "refs/tags/ztc-*",
+    "refs/tags/ztc-preview-v*",
+    "refs/tags/ztc-v*-signed",
+  ]) {
+    const state = idealState();
+    state.source.rulesets.push({
+      name: "Unrelated product tag policy",
+      enforcement: "active",
+      target: "tag",
+      include: [include],
+      exclude: [],
+      bypass: [],
+      rules: ["deletion"],
+    });
+    assert.deepEqual(errorCodes(state), [], `allowed ${include}`);
+  }
+
+  for (const include of [
+    "prefix/refs/tags/ztc-v*",
+    "refs/tags/ztc-v*/suffix",
+    "refs/tags/*",
+    "refs/tags/zergchat-v*",
+  ]) {
+    const state = idealState();
+    state.source.rulesets.push({
+      name: "Untrusted wildcard policy",
+      enforcement: "active",
+      target: "tag",
+      include: [include],
+      exclude: [],
+      bypass: [],
+      rules: ["deletion"],
+    });
+    assert.deepEqual(
+      errorCodes(state),
+      ["source-ruleset-contract"],
+      `rejected ${include}`,
+    );
+  }
+});
+
 test("malformed ruleset elements return controlled public diagnostics", () => {
   for (const [label, value] of [
     ["undefined", undefined],
