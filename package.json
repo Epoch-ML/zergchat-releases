@@ -11,6 +11,7 @@
     "test:mutation:notes": "stryker run stryker.notes.config.mjs",
     "test:mutation:pages": "stryker run stryker.pages.config.mjs",
     "test:mutation:payload": "stryker run stryker.payload.config.mjs",
+    "test:mutation:policy": "stryker run stryker.policy.config.mjs",
     "test:mutation:request": "stryker run stryker.request.config.mjs",
     "test:mutation:signing": "stryker run stryker.signing.config.mjs"
   },
