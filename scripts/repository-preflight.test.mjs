@@ -308,6 +308,20 @@ test("every ruleset identity, reference, bypass, and rule is exact", () => {
   }
 });
 
+test("invalid list shapes cannot impersonate intentionally empty protections", () => {
+  const state = idealState();
+  state.release.environments["zergchat-apple-preview"].secrets = "none";
+  state.release.rulesets.find(
+    ({ name }) => name === "Release branch history",
+  ).bypass = "none";
+  state.source.environments["zergchat-release-request"].reviewers = "none";
+  assert.deepEqual(errorCodes(state), [
+    "environment-contract",
+    "ruleset-contract",
+    "source-environment-contract",
+  ]);
+});
+
 test("feed and source deploy-key authority is exact", () => {
   for (const mutate of [
     (state) => { state.release.deployKeys[0].verified = false; },
