@@ -616,6 +616,29 @@ test("the collector normalizes settings through one injected HTTP boundary", asy
     bypass: [], rules: ["deletion", "non_fast_forward"],
   }]);
   assert.deepEqual(calls, [...responses.keys()]);
+
+  for (const [key, malformed] of [
+    ["Epoch-ML/zergchat-releases:actions/secrets", { secrets: "invalid" }],
+    ["Epoch-ML/zerg:actions/secrets", { secrets: null }],
+    ["Epoch-ML/zergchat-releases:rulesets", { rulesets: [] }],
+    ["Epoch-ML/zerg:environments", {
+      environments: [{
+        name: "zergchat-release-request", protection_rules: "invalid",
+      }],
+    }],
+    ["Epoch-ML/zergchat-releases:environments/zergchat-feed/secrets", {
+      secrets: null,
+    }],
+  ]) {
+    const original = responses.get(key);
+    responses.set(key, malformed);
+    await assert.rejects(
+      collectRepositoryState({ request }),
+      (error) => error instanceof RepositoryPreflightError,
+      key,
+    );
+    responses.set(key, original);
+  }
 });
 
 test("the collector rejects a non-callable request boundary", async () => {
