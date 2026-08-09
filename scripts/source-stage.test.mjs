@@ -35,7 +35,7 @@ async function makeFixture(metadataOverrides = {}) {
   const inputDirectory = join(root, "input");
   const outputDirectory = join(root, "output");
   await mkdir(inputDirectory);
-  const archiveName = "ZERGCHAT_0.2.0-preview.1_aarch64.source.app.tar.gz";
+  const archiveName = "Zergchat_0.1.9-preview.1_universal.source.app.tar.gz";
   await packageMacApplication({
     applicationPath,
     outputPath: join(inputDirectory, archiveName),
@@ -45,11 +45,11 @@ async function makeFixture(metadataOverrides = {}) {
   await writeFile(join(inputDirectory, "build-metadata.json"), `${JSON.stringify({
     schema_version: 2,
     product: "Zergchat",
-    version: "0.2.0-preview.1",
+    version: "0.1.9-preview.1",
     channel: "preview",
-    release_tag: "zergchat-preview-v0.2.0-preview.1",
+    release_tag: "zergchat-preview-v0.1.9-preview.1",
     source_sha: sourceSha,
-    platform: "darwin-aarch64",
+    platform: "darwin-universal",
     apple_signature: "none",
     ...metadataOverrides,
   }, null, 2)}\n`);
@@ -59,9 +59,9 @@ async function makeFixture(metadataOverrides = {}) {
     publicKeyPath: join(root, "trusted.pubkey"),
     request: {
       channel: "preview",
-      releaseTag: "zergchat-preview-v0.2.0-preview.1",
+      releaseTag: "zergchat-preview-v0.1.9-preview.1",
       sourceSha,
-      version: "0.2.0-preview.1",
+      version: "0.1.9-preview.1",
     },
   };
 }
@@ -173,7 +173,7 @@ describe("hostile Zergchat source stage", () => {
       [{ version: "0.2.1" }, /source-stage version does not match/],
       [{ channel: "stable" }, /source-stage channel does not match/],
       [{ release_tag: "zergchat-preview-v0.2.1" }, /source-stage release tag does not match/],
-      [{ platform: "darwin-x86_64" }, /source-stage platform does not match/],
+      [{ platform: "darwin-aarch64" }, /source-stage platform does not match/],
       [{ apple_signature: "developer-id" }, /source-stage Apple signature state does not match/],
     ];
     for (const [overrides, expected] of cases) {

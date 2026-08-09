@@ -219,7 +219,7 @@ describe("Zergchat release workflow contract", () => {
     assert.match(workflow, /find "\$bundle_root\/macos" -maxdepth 1 -type d -name '\*\.app'/);
     assert.match(workflow, /"\$\{#apps\[@\]\}" -ne 1/);
     assert.match(workflow, /hdiutil create/);
-    assert.match(workflow, /ZERGCHAT_\$\{VERSION\}_aarch64\.dmg/);
+    assert.match(workflow, /Zergchat_\$\{VERSION\}_universal\.dmg/);
   });
 
   it("publishes immutable assets and only channel-scoped v2 Pages feeds", () => {
@@ -632,7 +632,11 @@ describe("Zergchat release workflow contract", () => {
     assert.match(workflow, /universal\.source\.app\.tar\.gz/);
     assert.match(workflow, /ZERGCHAT_STAGE_MAX_ENTRY_COUNT/);
     assert.match(workflow, /ZERGCHAT_STAGE_MAX_UNCOMPRESSED_BYTES/);
-    assert.doesNotMatch(hostileStage, /Contents\/MacOS\/Zergchat(?:\s|"|'|$)/);
+    assert.doesNotMatch(
+      hostileStage,
+      /(?:^|\n)\s*["']?\$app\/Contents\/MacOS\/Zergchat["']?(?:\s|$)/,
+      "the hostile application executable must be inspected, never launched",
+    );
     assert.match(hostileStage, /codesign_status=0/);
     assert.match(hostileStage, /scripts\/verify-source-signature\.mjs/);
     assert.doesNotMatch(

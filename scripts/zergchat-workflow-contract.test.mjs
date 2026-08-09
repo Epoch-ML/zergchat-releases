@@ -98,4 +98,32 @@ describe("ZergChat source-build release contract", () => {
     assert.match(stage.run, /platform: "darwin-universal"/);
     assert.match(stage.run, /product: "Zergchat"/);
   });
+
+  it("validates both slices before Apple credentials and signs the universal disk image", () => {
+    const apple = requireJob("apple-sign");
+    const hostile = requireStep(apple, "Verify and extract the hostile source stage");
+    assert.match(hostile.run, /Zergchat_\$\{VERSION\}_universal\.source\.app\.tar\.gz/);
+    assert.match(hostile.run, /lipo -archs/);
+    assert.match(hostile.run, /arm64/);
+    assert.match(hostile.run, /x86_64/);
+    assert.doesNotMatch(JSON.stringify(hostile), /ZERGCHAT_APPLE_/);
+
+    const signing = requireStep(apple, "Apply preview ad-hoc or fail-closed stable Apple signing");
+    assert.match(signing.run, /Zergchat_\$\{VERSION\}_universal\.dmg/);
+    assert.match(signing.run, /codesign --force --timestamp --sign "\$identity" "\$dmg"/);
+    assert.match(signing.run, /notarytool submit "\$dmg"/);
+    assert.match(signing.run, /stapler validate "\$dmg"/);
+    assert.match(signing.run, /spctl --assess --type open --context context:primary-signature/);
+    assert.match(signing.run, /source=Notarized Developer ID/);
+  });
+
+  it("signs and publishes the exact universal updater archive", () => {
+    const updater = requireJob("sign-updater");
+    const sign = requireStep(updater, "Sign only the finished updater archive");
+    assert.match(sign.run, /Zergchat_\$\{VERSION\}_universal\.app\.tar\.gz/);
+    const collect = requireStep(updater, "Collect and verify the immutable release payload");
+    assert.match(collect.run, /scripts\/collect-release\.mjs/);
+    assert.match(collect.run, /darwin-aarch64/);
+    assert.match(collect.run, /darwin-x86_64/);
+  });
 });

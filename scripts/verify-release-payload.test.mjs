@@ -64,9 +64,9 @@ async function makePayload(label, payloadRequest = request()) {
   temporaryDirectories.push(root);
   const directory = join(root, "release");
   await mkdir(directory);
-  const archiveName = `ZERGCHAT_${payloadRequest.version}_aarch64.app.tar.gz`;
+  const archiveName = `Zergchat_${payloadRequest.version}_universal.app.tar.gz`;
   const signatureName = `${archiveName}.sig`;
-  const diskImageName = `ZERGCHAT_${payloadRequest.version}_aarch64.dmg`;
+  const diskImageName = `Zergchat_${payloadRequest.version}_universal.dmg`;
   const archive = Buffer.from(`gzip archive bytes from ${label}`);
   const signature = Buffer.from(
     `untrusted comment: signature from tauri secret key\n${label.padEnd(96, "-")}\n`,
@@ -95,7 +95,7 @@ async function makePayload(label, payloadRequest = request()) {
       product: "Zergchat",
       version: payloadRequest.version,
       channel: payloadRequest.channel,
-      platform: "darwin-aarch64",
+      platform: "darwin-universal",
       source_sha: payloadRequest.sourceSha,
       apple_notarized: payloadRequest.channel === "stable",
       artifacts: artifactMetadata,
@@ -109,6 +109,12 @@ async function makePayload(label, payloadRequest = request()) {
       pub_date: payloadRequest.requestedAt,
       platforms: {
         "darwin-aarch64": {
+          signature,
+          url:
+            `https://github.com/${releaseRepository}/releases/download/` +
+            `${encodeURIComponent(payloadRequest.releaseTag)}/${encodeURIComponent(archiveName)}`,
+        },
+        "darwin-x86_64": {
           signature,
           url:
             `https://github.com/${releaseRepository}/releases/download/` +
@@ -146,6 +152,7 @@ async function replaceSignature(fixture, signature) {
   });
   await rewriteJson(fixture.directory, "latest.json", (manifest) => {
     manifest.platforms["darwin-aarch64"].signature = signature;
+    manifest.platforms["darwin-x86_64"].signature = signature;
   });
   const checksumPath = join(fixture.directory, "checksums.txt");
   const checksumLines = (await readFile(checksumPath, "utf8"))
@@ -189,9 +196,9 @@ describe("canonical Zergchat release payload verification", () => {
     assert.equal(result.archiveName, fixture.archiveName);
     assert.equal(result.hashes[fixture.archiveName], sha256(fixture.archive));
     assert.deepEqual(result.assetNames, [
-      `ZERGCHAT_${version}_aarch64.app.tar.gz`,
-      `ZERGCHAT_${version}_aarch64.app.tar.gz.sig`,
-      `ZERGCHAT_${version}_aarch64.dmg`,
+      `Zergchat_${version}_universal.app.tar.gz`,
+      `Zergchat_${version}_universal.app.tar.gz.sig`,
+      `Zergchat_${version}_universal.dmg`,
       "checksums.txt",
       "latest.json",
       "release-metadata.json",
@@ -733,7 +740,7 @@ describe("canonical Zergchat release payload verification", () => {
       releaseRepository,
       request: stableRequest,
     });
-    assert.equal(stableResult.archiveName, "ZERGCHAT_0.2.0_aarch64.app.tar.gz");
+    assert.equal(stableResult.archiveName, "Zergchat_0.2.0_universal.app.tar.gz");
 
     const nonArray = await makePayload("canonical release");
     await rewriteJson(nonArray.directory, "release-metadata.json", (metadata) => {
@@ -859,7 +866,11 @@ describe("canonical Zergchat release payload verification", () => {
       {},
       {
         "darwin-aarch64": { signature: "value", url: "value" },
+      },
+      {
+        "darwin-aarch64": { signature: "value", url: "value" },
         "darwin-x86_64": { signature: "value", url: "value" },
+        "darwin-universal": { signature: "value", url: "value" },
       },
     ]) {
       const wrongPlatforms = await makePayload("canonical release");
@@ -891,7 +902,7 @@ describe("canonical Zergchat release payload verification", () => {
 
     const wrongSignature = await makePayload("canonical release");
     await rewriteJson(wrongSignature.directory, "latest.json", (manifest) => {
-      manifest.platforms["darwin-aarch64"].signature = "different";
+      manifest.platforms["darwin-x86_64"].signature = "different";
     });
     await expectPayloadError(
       {
@@ -935,7 +946,7 @@ describe("canonical Zergchat release payload verification", () => {
 
     const wrongUrl = await makePayload("canonical release");
     await rewriteJson(wrongUrl.directory, "latest.json", (manifest) => {
-      manifest.platforms["darwin-aarch64"].url =
+      manifest.platforms["darwin-x86_64"].url =
         "https://github.com/Epoch-ML/zergchat-releases/releases/download/other/file";
     });
     await expectPayloadError(

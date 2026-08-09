@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
@@ -19,18 +19,28 @@ async function makeFixture(overrides = {}) {
   const outputDirectory = join(root, "output");
   const publicKeyPath = join(root, "trusted.pubkey");
   await mkdir(inputDirectory, { recursive: true });
-  await writeFile(join(inputDirectory, "Zergchat.app.tar.gz"), "signed app archive");
-  await writeFile(join(inputDirectory, "Zergchat.app.tar.gz.sig"), "encoded updater signature\n");
-  await writeFile(join(inputDirectory, "ZERGCHAT_0.2.0_aarch64.dmg"), "signed disk image");
+  await writeFile(
+    join(inputDirectory, "Zergchat_0.1.9-preview.1_universal.app.tar.gz"),
+    "signed app archive",
+  );
+  await writeFile(
+    join(inputDirectory, "Zergchat_0.1.9-preview.1_universal.app.tar.gz.sig"),
+    "encoded updater signature\n",
+  );
+  await writeFile(
+    join(inputDirectory, "Zergchat_0.1.9-preview.1_universal.dmg"),
+    "signed disk image",
+  );
   await writeFile(join(inputDirectory, "updater.pubkey"), updaterPublicKey);
   await writeFile(publicKeyPath, updaterPublicKey);
   await writeFile(join(inputDirectory, "build-metadata.json"), `${JSON.stringify({
     schema_version: 1,
     product: "Zergchat",
-    version: "0.2.0-preview.1",
+    version: "0.1.9-preview.1",
     channel: "preview",
-    release_tag: "zergchat-preview-v0.2.0-preview.1",
+    release_tag: "zergchat-preview-v0.1.9-preview.1",
     source_sha: sourceSha,
+    platform: "darwin-universal",
     apple_notarized: false,
     ...overrides,
   }, null, 2)}\n`);
@@ -41,9 +51,9 @@ function previewRequest(overrides = {}) {
   return {
     channel: "preview",
     requestedAt,
-    releaseTag: "zergchat-preview-v0.2.0-preview.1",
+    releaseTag: "zergchat-preview-v0.1.9-preview.1",
     sourceSha,
-    version: "0.2.0-preview.1",
+    version: "0.1.9-preview.1",
     ...overrides,
   };
 }
@@ -64,20 +74,24 @@ describe("trusted Zergchat updater release collection", () => {
     });
 
     assert.deepEqual(result.manifest, {
-      version: "0.2.0-preview.1",
+      version: "0.1.9-preview.1",
       notes: "",
       pub_date: requestedAt,
       platforms: {
         "darwin-aarch64": {
           signature: "encoded updater signature",
-          url: "https://github.com/Epoch-ML/zergchat-releases/releases/download/zergchat-preview-v0.2.0-preview.1/Zergchat.app.tar.gz",
+          url: "https://github.com/Epoch-ML/zergchat-releases/releases/download/zergchat-preview-v0.1.9-preview.1/Zergchat_0.1.9-preview.1_universal.app.tar.gz",
+        },
+        "darwin-x86_64": {
+          signature: "encoded updater signature",
+          url: "https://github.com/Epoch-ML/zergchat-releases/releases/download/zergchat-preview-v0.1.9-preview.1/Zergchat_0.1.9-preview.1_universal.app.tar.gz",
         },
       },
     });
     assert.deepEqual(result.assets.map((path) => path.split("/").at(-1)), [
-      "Zergchat.app.tar.gz",
-      "Zergchat.app.tar.gz.sig",
-      "ZERGCHAT_0.2.0_aarch64.dmg",
+      "Zergchat_0.1.9-preview.1_universal.app.tar.gz",
+      "Zergchat_0.1.9-preview.1_universal.app.tar.gz.sig",
+      "Zergchat_0.1.9-preview.1_universal.dmg",
       "checksums.txt",
       "release-metadata.json",
     ]);
@@ -85,31 +99,25 @@ describe("trusted Zergchat updater release collection", () => {
       await readFile(join(fixture.outputDirectory, "release-metadata.json"), "utf8"),
     );
     assert.equal(metadata.source_sha, sourceSha);
+    assert.equal(metadata.platform, "darwin-universal");
     assert.equal(metadata.apple_notarized, false);
     assert.deepEqual(metadata.artifacts[0], {
-      name: "Zergchat.app.tar.gz",
+      name: "Zergchat_0.1.9-preview.1_universal.app.tar.gz",
       sha256: createHash("sha256").update("signed app archive").digest("hex"),
     });
   });
 
-  it("percent-encodes preview build metadata in immutable release URLs", async () => {
-    const fixture = await makeFixture({
-      version: "0.2.0-preview.1+arm64",
-      release_tag: "zergchat-preview-v0.2.0-preview.1+arm64",
-    });
+  it("maps both macOS architectures to the same universal updater bytes", async () => {
+    const fixture = await makeFixture();
     const result = await collectSignedRelease({
       ...fixture,
       releaseRepository: "Epoch-ML/zergchat-releases",
-      request: previewRequest({
-        version: "0.2.0-preview.1+arm64",
-        releaseTag: "zergchat-preview-v0.2.0-preview.1+arm64",
-      }),
+      request: previewRequest(),
     });
 
-    assert.equal(
-      result.manifest.platforms["darwin-aarch64"].url,
-      "https://github.com/Epoch-ML/zergchat-releases/releases/download/" +
-        "zergchat-preview-v0.2.0-preview.1%2Barm64/Zergchat.app.tar.gz",
+    assert.deepEqual(
+      result.manifest.platforms["darwin-x86_64"],
+      result.manifest.platforms["darwin-aarch64"],
     );
   });
 
@@ -134,13 +142,23 @@ describe("trusted Zergchat updater release collection", () => {
       }),
       /source updater key does not match the independent release trust root/,
     );
+
+    const wrongPlatform = await makeFixture({ platform: "darwin-aarch64" });
+    await assert.rejects(
+      collectSignedRelease({
+        ...wrongPlatform,
+        releaseRepository: "Epoch-ML/zergchat-releases",
+        request: previewRequest(),
+      }),
+      /build platform must be darwin-universal/,
+    );
   });
 
   it("requires notarization for stable and exactly one non-empty signed artifact set", async () => {
     const stable = await makeFixture({
-      version: "0.2.0",
+      version: "0.1.9",
       channel: "stable",
-      release_tag: "zergchat-v0.2.0",
+      release_tag: "zergchat-v0.1.9",
       apple_notarized: false,
     });
     await assert.rejects(
@@ -148,16 +166,19 @@ describe("trusted Zergchat updater release collection", () => {
         ...stable,
         releaseRepository: "Epoch-ML/zergchat-releases",
         request: previewRequest({
-          version: "0.2.0",
+          version: "0.1.9",
           channel: "stable",
-          releaseTag: "zergchat-v0.2.0",
+          releaseTag: "zergchat-v0.1.9",
         }),
       }),
       /stable release requires verified Apple notarization/,
     );
 
     const emptySignature = await makeFixture();
-    await writeFile(join(emptySignature.inputDirectory, "Zergchat.app.tar.gz.sig"), "  \n");
+    await writeFile(
+      join(emptySignature.inputDirectory, "Zergchat_0.1.9-preview.1_universal.app.tar.gz.sig"),
+      "  \n",
+    );
     await assert.rejects(
       collectSignedRelease({
         ...emptySignature,
@@ -176,6 +197,24 @@ describe("trusted Zergchat updater release collection", () => {
         request: previewRequest(),
       }),
       /expected exactly one macOS updater archive; found 2/,
+    );
+
+    const misnamed = await makeFixture();
+    await rename(
+      join(misnamed.inputDirectory, "Zergchat_0.1.9-preview.1_universal.app.tar.gz"),
+      join(misnamed.inputDirectory, "Zergchat_0.1.9-preview.2_universal.app.tar.gz"),
+    );
+    await rename(
+      join(misnamed.inputDirectory, "Zergchat_0.1.9-preview.1_universal.app.tar.gz.sig"),
+      join(misnamed.inputDirectory, "Zergchat_0.1.9-preview.2_universal.app.tar.gz.sig"),
+    );
+    await assert.rejects(
+      collectSignedRelease({
+        ...misnamed,
+        releaseRepository: "Epoch-ML/zergchat-releases",
+        request: previewRequest(),
+      }),
+      /updater archive name must be Zergchat_0\.1\.9-preview\.1_universal\.app\.tar\.gz/,
     );
 
     const unexpected = await makeFixture();
