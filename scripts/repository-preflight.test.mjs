@@ -114,6 +114,7 @@ const sourceRulesets = [
   { name: "Reviewed development changes", refs: ["refs/heads/development"],
     bypass: [reviewer], rules: [
       "pull_request:rebase:1:last-push", "required_linear_history",
+      "required_status_checks:Protected-base ZergLang release policy:15368:strict",
       "required_status_checks:Protected-base ZergChat release policy:15368:strict",
     ] },
   { name: "Desktop release tag authority", refs: desktopTags,
