@@ -14,12 +14,16 @@ const CANONICAL_PAGES_URL = "https://epoch-ml.github.io/zergchat-releases/";
 const EXPECTED_RELEASE_REPOSITORY = Object.freeze({
   full_name: RELEASE_REPOSITORY,
   private: false,
+  visibility: "public",
+  disabled: false,
   archived: false,
   default_branch: "main",
 });
 const EXPECTED_SOURCE_REPOSITORY = Object.freeze({
   full_name: SOURCE_REPOSITORY,
   private: true,
+  visibility: "private",
+  disabled: false,
   archived: false,
   default_branch: "development",
 });
@@ -414,6 +418,8 @@ function repositoryMatches(actual, expected) {
     !Array.isArray(actual) &&
     actual.full_name === expected.full_name &&
     actual.private === expected.private &&
+    actual.visibility === expected.visibility &&
+    actual.disabled === expected.disabled &&
     actual.archived === expected.archived &&
     actual.default_branch === expected.default_branch;
 }
@@ -902,6 +908,14 @@ function normalizeRepositoryMetadata(document, description) {
   return {
     full_name: requireString(metadata.full_name, `${description} full name`),
     private: requireBoolean(metadata.private, `${description} private state`),
+    visibility: requireString(
+      metadata.visibility,
+      `${description} visibility`,
+    ),
+    disabled: requireBoolean(
+      metadata.disabled,
+      `${description} disabled state`,
+    ),
     archived: requireBoolean(metadata.archived, `${description} archived state`),
     default_branch: requireString(
       metadata.default_branch,
