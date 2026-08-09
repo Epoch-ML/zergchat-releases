@@ -646,13 +646,18 @@ test("malformed ruleset elements return controlled public diagnostics", () => {
     );
   }
 
-  const release = idealState();
-  release.release.rulesets.push(7);
-  assert.deepEqual(
-    errorCodes(release),
-    ["ruleset-contract"],
-    "release/number",
-  );
+  for (const [label, value] of [
+    ["undefined", undefined],
+    ["number", 7],
+  ]) {
+    const state = idealState();
+    state.release.rulesets.push(value);
+    assert.deepEqual(
+      errorCodes(state),
+      ["ruleset-contract"],
+      `release/${label}`,
+    );
+  }
 });
 
 test("repository-scoped release credentials are rejected independently", () => {
