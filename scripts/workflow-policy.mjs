@@ -403,10 +403,20 @@ export function auditWorkflowPolicy(source) {
   const diagnostics = [];
   const occurrences = [];
 
-  const triggers = requireMapping(workflow.on, "workflow triggers");
+  const triggers = workflow.on !== null && typeof workflow.on === "object" &&
+      !Array.isArray(workflow.on)
+    ? workflow.on
+    : {};
   const triggerNames = Object.keys(triggers).sort();
-  const dispatch = requireMapping(triggers.workflow_dispatch, "workflow dispatch");
-  const inputs = requireMapping(dispatch.inputs, "workflow dispatch inputs");
+  const dispatch = triggers.workflow_dispatch !== null &&
+      typeof triggers.workflow_dispatch === "object" &&
+      !Array.isArray(triggers.workflow_dispatch)
+    ? triggers.workflow_dispatch
+    : {};
+  const inputs = dispatch.inputs !== null && typeof dispatch.inputs === "object" &&
+      !Array.isArray(dispatch.inputs)
+    ? dispatch.inputs
+    : {};
   if (
     !sameValue(triggerNames, ["workflow_dispatch"]) ||
     !sameValue(Object.keys(inputs).sort(), ["request"])
