@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import fc from "fast-check";
@@ -9,6 +11,10 @@ import {
   collectRepositoryState,
   requestGitHub,
 } from "./repository-preflight.mjs";
+
+const preflightCli = fileURLToPath(
+  new URL("./repository-preflight.mjs", import.meta.url),
+);
 
 const reviewer = "User:1042757";
 const mainRef = ["branch:main"];
@@ -313,6 +319,19 @@ test("every ruleset identity, reference, bypass, and rule is exact", () => {
       assert.deepEqual(errorCodes(missing), [expectedCode], `${owner}/${index}`);
     }
   }
+
+  for (const owner of ["release", "source"]) {
+    const state = idealState();
+    state[owner].rulesets.push({
+      name: "Unreviewed policy",
+      refs: ["~ALL"],
+      bypass: [reviewer],
+      rules: ["update"],
+    });
+    assert.deepEqual(errorCodes(state), [
+      owner === "release" ? "ruleset-contract" : "source-ruleset-contract",
+    ], `${owner}/extra`);
+  }
 });
 
 test("invalid list shapes cannot impersonate intentionally empty protections", () => {
@@ -357,6 +376,14 @@ test("feed and source deploy-key authority is exact", () => {
     mutate(state.source.deployKeys[0]);
     assert.deepEqual(errorCodes(state), ["source-key"]);
   }
+
+  const duplicateSourceReader = idealState();
+  duplicateSourceReader.source.deployKeys.push({
+    title: "ZergChat releases source checkout duplicate",
+    read_only: true,
+    verified: true,
+  });
+  assert.deepEqual(errorCodes(duplicateSourceReader), ["source-key"]);
 });
 
 test("every bounded release-data branch invariant is enforced", () => {
@@ -686,4 +713,15 @@ test("the collector rejects a non-callable request boundary", async () => {
     (error) => error instanceof RepositoryPreflightError &&
       error.message === "request must be a function",
   );
+});
+
+test("the preflight CLI rejects trailing arguments before any network access", () => {
+  const result = spawnSync(
+    process.execPath,
+    [preflightCli, "cutover", "unexpected"],
+    { encoding: "utf8", env: { ...process.env, GH_TOKEN: "" } },
+  );
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /usage: repository-preflight\.mjs cutover\|live/);
+  assert.doesNotMatch(result.stderr, /GH_TOKEN is required/);
 });
