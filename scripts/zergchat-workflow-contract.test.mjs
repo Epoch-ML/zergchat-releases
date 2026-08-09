@@ -44,25 +44,63 @@ describe("ZergChat source-build release contract", () => {
   it("runs the exact ZergChat source gates from the monorepo package", () => {
     const build = requireJob("build-macos");
     const install = requireStep(build, "Install locked dependencies and security tooling");
-    assert.match(install.run, /npm ci --prefix source\/zapps\/zergchat/);
+    assert.match(
+      install.run,
+      /^\s*npm ci --prefix source\/zapps\/zergchat\s*$/m,
+    );
+    assert.doesNotMatch(
+      install.run,
+      /npm ci[^\n]*--omit(?:=|\s+)optional/,
+      "the locked install must retain optional native builder dependencies",
+    );
 
     const sourceGate = requireStep(build, "Test and audit the exact source");
-    assert.equal(sourceGate["working-directory"], "source/zapps/zergchat");
+    assert.equal(sourceGate["working-directory"], undefined);
+    const orderedNativeGate = [
+      "npm run audit:native-release --prefix source/zapps/zergchat",
+      "npm run generate --prefix source/zapps/zergchat",
+      "npm run verify:native-release-footprint --prefix source/zapps/zergchat",
+    ];
+    const gateIndexes = orderedNativeGate.map((command) => {
+      assert.equal(
+        sourceGate.run.split("\n").filter((line) => line.trim() === command).length,
+        1,
+        `source gate must execute ${command} exactly once`,
+      );
+      return sourceGate.run.indexOf(command);
+    });
+    assert.ok(
+      gateIndexes[0] < gateIndexes[1] && gateIndexes[1] < gateIndexes[2],
+      "the source-owned audit must precede generation and footprint verification",
+    );
+    assert.doesNotMatch(
+      sourceGate.run,
+      /npm audit(?:\s|$)/,
+      "the public workflow must delegate the production audit policy to ZergChat",
+    );
     for (const command of [
-      "npm audit --omit=dev --audit-level=moderate",
-      "npm run test:unit",
-      "npm run test:e2e --",
-      "npm run typecheck",
-      "npm run build",
-      "npm run generate",
-      "npm run theme:check",
-      "cargo test --locked --manifest-path src-tauri/Cargo.toml",
-      "cargo check --locked --lib --manifest-path src-tauri/Cargo.toml",
-      "cargo clippy --locked --lib --manifest-path src-tauri/Cargo.toml -- -D warnings",
-      "cargo fmt --all --manifest-path src-tauri/Cargo.toml -- --check",
+      "npm run test:unit --prefix source/zapps/zergchat",
+      "npm run test:e2e --prefix source/zapps/zergchat --",
+      "npm run typecheck --prefix source/zapps/zergchat",
+      "npm run build --prefix source/zapps/zergchat",
+      "npm run theme:check --prefix source/zapps/zergchat",
+      "cargo test --locked --manifest-path source/zapps/zergchat/src-tauri/Cargo.toml",
+      "cargo check --locked --lib --manifest-path source/zapps/zergchat/src-tauri/Cargo.toml",
+      "cargo clippy --locked --lib --manifest-path source/zapps/zergchat/src-tauri/Cargo.toml -- -D warnings",
+      "cargo fmt --all --manifest-path source/zapps/zergchat/src-tauri/Cargo.toml -- --check",
     ]) {
       assert.ok(sourceGate.run.includes(command), `source gate must execute ${command}`);
     }
+
+    const sourceGateIndex = build.steps.indexOf(sourceGate);
+    const appBuildIndex = build.steps.indexOf(requireStep(
+      build,
+      "Build the unsigned app without release signing credentials",
+    ));
+    assert.ok(
+      sourceGateIndex >= 0 && appBuildIndex > sourceGateIndex,
+      "the verified native frontend must pass its source gate before Tauri builds it",
+    );
   });
 
   it("binds source media capabilities to public bytes before source execution", () => {
