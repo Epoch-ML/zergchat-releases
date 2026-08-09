@@ -56,7 +56,7 @@ function assertMetadata(metadata, request) {
     channel: request.channel,
     release_tag: request.releaseTag,
     source_sha: request.sourceSha,
-    platform: "darwin-aarch64",
+    platform: "darwin-universal",
     apple_signature: "none",
   };
   const labels = {
@@ -91,7 +91,7 @@ export async function prepareSourceStage(options) {
   ));
   const request = options.request;
   const version = requireString(request?.version, "release request version is required");
-  const archiveName = `ZERGCHAT_${version}_aarch64.source.app.tar.gz`;
+  const archiveName = `Zergchat_${version}_universal.source.app.tar.gz`;
   await assertExactRegularFiles(inputDirectory, new Set([
     archiveName,
     "build-metadata.json",

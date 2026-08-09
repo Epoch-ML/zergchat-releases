@@ -465,6 +465,8 @@ jobs:
         run: |
           set -euo pipefail
           node scripts/release-request.mjs "$REQUEST_PATH"
+          source_archive="source-stage/Zergchat_${VERSION}_universal.source.app.tar.gz"
+          test -f "$source_archive" && test ! -L "$source_archive"
           node scripts/extract-macos-stage.mjs \
             "$REQUEST_PATH" \
             source-stage \
@@ -477,6 +479,10 @@ jobs:
             "com.zergai.zergchat"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$plist")" = \
             "$VERSION"
+          architectures="$(lipo -archs "$app/Contents/MacOS/Zergchat")"
+          test "$(wc -w <<<"$architectures" | tr -d ' ')" -eq 2
+          grep -qw arm64 <<<"$architectures"
+          grep -qw x86_64 <<<"$architectures"
 
           signature_details="$RUNNER_TEMP/zergchat-source-signature.txt"
           codesign_status=0
@@ -578,19 +584,18 @@ jobs:
           mkdir -p "$output" "$dmg_root"
           ditto "$app" "$dmg_root/Zergchat.app"
           ln -s /Applications "$dmg_root/Applications"
-          dmg="$output/ZERGCHAT_${VERSION}_aarch64.dmg"
+          dmg="$output/Zergchat_${VERSION}_universal.dmg"
           hdiutil create \
             -volname Zergchat \
             -srcfolder "$dmg_root" \
             -format UDZO \
             -ov "$dmg"
-          dmg_sign_args=(--force --sign "$identity")
           if [[ "$CHANNEL" == "stable" ]]; then
-            dmg_sign_args+=(--timestamp)
+            codesign --force --timestamp --sign "$identity" "$dmg"
           else
-            dmg_sign_args+=(--timestamp=none)
+            codesign --force --timestamp=none --sign - "$dmg"
           fi
-          codesign "${dmg_sign_args[@]}" "$dmg"
+          codesign --verify --strict --verbose=2 "$dmg"
           hdiutil verify "$dmg" >/dev/null
 
           if [[ "$CHANNEL" == "stable" ]]; then
@@ -604,13 +609,14 @@ jobs:
             xcrun stapler staple "$dmg"
             xcrun stapler validate "$dmg"
             spctl --assess --type execute --verbose=4 "$app"
-            spctl --assess --type open \
-              --context context:primary-signature --verbose=4 "$dmg"
+            gatekeeper_output="$(spctl --assess --type open --context context:primary-signature \
+              --verbose=4 "$dmg" 2>&1)"
+            grep -F "source=Notarized Developer ID" <<<"$gatekeeper_output"
           fi
           codesign --verify --deep --strict --verbose=2 "$app"
           codesign --verify --strict --verbose=2 "$dmg"
 
-          archive="$output/ZERGCHAT_${VERSION}_aarch64.app.tar.gz"
+          archive="$output/Zergchat_${VERSION}_universal.app.tar.gz"
           node scripts/package-macos.mjs "$app" "$archive"
           if [[ "$CHANNEL" == "stable" ]]; then
             cp keys/zergchat-stable-updater.pubkey "$output/updater.pubkey"
@@ -629,6 +635,7 @@ jobs:
             channel: process.env.CHANNEL,
             release_tag: process.env.RELEASE_TAG,
             source_sha: process.env.SOURCE_SHA,
+            platform: "darwin-universal",
             apple_notarized: process.env.APPLE_NOTARIZED === "true",
           };
           await writeFile(
@@ -741,19 +748,17 @@ jobs:
             echo "::error::The environment-scoped $CHANNEL updater signing identity is incomplete."
             exit 1
           fi
-          mapfile -t archives < <(find release-input -maxdepth 1 -type f -name '*.app.tar.gz' -print)
-          if [[ "${#archives[@]}" -ne 1 ]]; then
-            echo "::error::Expected exactly one updater archive."
-            exit 1
-          fi
-          npm exec --offline -- tauri signer sign "${archives[0]}"
-          test -s "${archives[0]}.sig"
+          archive="release-input/Zergchat_${VERSION}_universal.app.tar.gz"
+          test -f "$archive" && test ! -L "$archive"
+          npm exec --offline -- tauri signer sign "$archive"
+          test -s "${archive}.sig"
 
       - name: Verify the updater signature with the public trust root
         shell: bash
         run: |
           set -euo pipefail
-          archive="$(find release-input -maxdepth 1 -type f -name '*.app.tar.gz' -print)"
+          archive="release-input/Zergchat_${VERSION}_universal.app.tar.gz"
+          test -f "$archive" && test ! -L "$archive"
           signature="${archive}.sig"
           if [[ "$CHANNEL" == "stable" ]]; then
             public_key="keys/zergchat-stable-updater.pubkey"
@@ -806,6 +811,11 @@ jobs:
           assert.ok(
             manifest.platforms["darwin-aarch64"].signature.length > 32,
             "updater signature must be substantive",
+          );
+          assert.deepEqual(
+            manifest.platforms["darwin-x86_64"],
+            manifest.platforms["darwin-aarch64"],
+            "both macOS architectures must resolve to the same universal archive",
           );
           NODE
 

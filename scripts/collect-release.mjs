@@ -73,6 +73,9 @@ function assertBuildMetadata(metadata, request) {
   if (metadata.source_sha !== request.sourceSha) {
     throw new Error("build source SHA does not match the release request");
   }
+  if (metadata.platform !== "darwin-universal") {
+    throw new Error("build platform must be darwin-universal");
+  }
   if (request.channel === "stable" && metadata.apple_notarized !== true) {
     throw new Error("stable release requires verified Apple notarization");
   }
@@ -128,6 +131,10 @@ export async function collectSignedRelease(options) {
     (name) => name.endsWith(".app.tar.gz"),
     "macOS updater archive",
   );
+  const expectedArchiveName = `Zergchat_${request.version}_universal.app.tar.gz`;
+  if (basename(archivePath) !== expectedArchiveName) {
+    throw new Error(`updater archive name must be ${expectedArchiveName}`);
+  }
   const signaturePath = `${archivePath}.sig`;
   const signature = (await readFile(signaturePath, "utf8")).trim();
   if (signature === "") {
@@ -138,6 +145,10 @@ export async function collectSignedRelease(options) {
     (name) => name.endsWith(".dmg"),
     "macOS disk image",
   );
+  const expectedDiskImageName = `Zergchat_${request.version}_universal.dmg`;
+  if (basename(diskImagePath) !== expectedDiskImageName) {
+    throw new Error(`disk image name must be ${expectedDiskImageName}`);
+  }
   await assertExactInputEntries(inputDirectory, new Set([
     "build-metadata.json",
     "updater.pubkey",
@@ -156,6 +167,10 @@ export async function collectSignedRelease(options) {
     pub_date: request.requestedAt,
     platforms: {
       "darwin-aarch64": {
+        signature,
+        url: archiveUrl,
+      },
+      "darwin-x86_64": {
         signature,
         url: archiveUrl,
       },
@@ -186,7 +201,7 @@ export async function collectSignedRelease(options) {
     product: "Zergchat",
     version: request.version,
     channel: request.channel,
-    platform: "darwin-aarch64",
+    platform: "darwin-universal",
     source_sha: request.sourceSha,
     apple_notarized: buildMetadata.apple_notarized,
     artifacts: metadataArtifacts,

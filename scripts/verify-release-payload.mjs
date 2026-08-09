@@ -148,6 +148,13 @@ export async function verifyReleasePayload(options) {
   const archiveName = archives[0];
   const signatureName = `${archiveName}.sig`;
   const diskImageName = diskImages[0];
+  const expectedArchiveName = `Zergchat_${request.version}_universal.app.tar.gz`;
+  const expectedDiskImageName = `Zergchat_${request.version}_universal.dmg`;
+  if (archiveName !== expectedArchiveName || diskImageName !== expectedDiskImageName) {
+    throw new ReleasePayloadError(
+      "release payload artifact names do not match the requested universal build",
+    );
+  }
   const binaryNames = [archiveName, signatureName, diskImageName];
   assertSameNames(
     names,
@@ -218,7 +225,7 @@ export async function verifyReleasePayload(options) {
   if (
     metadata.version !== request.version ||
     metadata.channel !== request.channel ||
-    metadata.platform !== "darwin-aarch64" ||
+    metadata.platform !== "darwin-universal" ||
     metadata.source_sha !== request.sourceSha
   ) {
     throw new ReleasePayloadError("release metadata provenance does not match request");
@@ -267,26 +274,28 @@ export async function verifyReleasePayload(options) {
   const platformNames = Object.keys(manifest.platforms ?? {});
   assertSameNames(
     platformNames,
-    ["darwin-aarch64"],
+    ["darwin-aarch64", "darwin-x86_64"],
     "updater manifest platforms differ",
   );
-  const platform = manifest.platforms["darwin-aarch64"];
   const signature = (
     await readControlFile(join(directory, signatureName))
   ).trim();
-  if (platform?.signature !== signature) {
-    throw new ReleasePayloadError(
-      "updater manifest signature does not match the signature asset",
-    );
-  }
   assertCanonicalBase64(signature);
   const expectedUrl =
     `https://github.com/${releaseRepository}/releases/download/` +
     `${encodeURIComponent(request.releaseTag)}/${encodeURIComponent(archiveName)}`;
-  if (platform.url !== expectedUrl) {
-    throw new ReleasePayloadError(
-      "updater manifest URL does not identify the immutable release archive",
-    );
+  for (const platformName of ["darwin-aarch64", "darwin-x86_64"]) {
+    const platform = manifest.platforms[platformName];
+    if (platform?.signature !== signature) {
+      throw new ReleasePayloadError(
+        "updater manifest signature does not match the signature asset",
+      );
+    }
+    if (platform.url !== expectedUrl) {
+      throw new ReleasePayloadError(
+        "updater manifest URL does not identify the immutable release archive",
+      );
+    }
   }
 
   return {
