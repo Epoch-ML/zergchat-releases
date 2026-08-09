@@ -57,6 +57,8 @@ const STABLE_METADATA_PATH_PATTERN =
   /^stable\/releases\/(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.json$/;
 const PREVIEW_METADATA_PATH_PATTERN =
   /^preview\/releases\/(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)-preview\.(?:[1-9]\d*)\.json$/;
+const PRODUCT_SCOPED_TAG_WILDCARD_PATTERN =
+  /^refs\/tags\/[A-Za-z0-9._]+-[^/]*[*?\[][^/]*$/;
 const REQUIRED_RELEASE_DATA_DIRECTORIES = new Set([
   "preview",
   "preview/releases",
@@ -425,7 +427,9 @@ function sourceRulesetIsRelevant(ruleset, expectedNames) {
   const scopedText = [ruleset.name, ...ruleset.include, ...ruleset.rules];
   return scopedText.some((value) => value.toLowerCase().includes("zergchat")) ||
     ruleset.include.some((value) =>
-      sourceWideRefs.has(value) || /[*?\[]/.test(value)
+      sourceWideRefs.has(value) ||
+      (/[*?\[]/.test(value) &&
+        !PRODUCT_SCOPED_TAG_WILDCARD_PATTERN.test(value))
     );
 }
 
