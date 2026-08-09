@@ -250,10 +250,10 @@ test("every Pages and workflow identity is independently enforced", () => {
 
   const unrelated = idealState();
   unrelated.release.workflows.push({
-    path: ".github/workflows/unrelated.yml",
+    path: ".github/workflows/hidden-export.yml",
     state: "active",
   });
-  assert.equal(errorCodes(unrelated).includes("workflow-state"), false);
+  assert.deepEqual(errorCodes(unrelated), ["workflow-state"]);
 });
 
 test("every environment field and required secret is exact", () => {
@@ -273,6 +273,13 @@ test("every environment field and required secret is exact", () => {
   const missing = idealState();
   delete missing.release.environments["zergchat-preview-build"];
   assert.deepEqual(errorCodes(missing), ["environment-contract"]);
+
+  const unexpected = idealState();
+  unexpected.release.environments["hidden-export"] = {
+    secrets: ["UNREVIEWED_KEY"], refs: mainRef, reviewers: [],
+    prevent_self_review: null, wait_timer: null,
+  };
+  assert.deepEqual(errorCodes(unexpected), ["environment-contract"]);
 
   for (const mutate of [
     (environment) => { environment.refs = ["branch:development"]; },
