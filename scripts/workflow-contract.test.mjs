@@ -257,11 +257,9 @@ describe("Zergchat release workflow contract", () => {
   });
 
   it("keeps queued Pages deployments recoverable before HTTPS verification", () => {
-    assert.match(
-      workflow,
-      /actions\/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b/,
-    );
+    assert.doesNotMatch(workflow, /actions\/configure-pages@/);
     assert.doesNotMatch(workflow, /actions\/upload-pages-artifact@/);
+    assert.doesNotMatch(workflow, /actions\/deploy-pages@/);
     const deployJob = workflow.indexOf("deploy-pages:");
     const promoteJob = workflow.slice(
       workflow.indexOf("\n  promote-feed:"),
@@ -294,6 +292,8 @@ describe("Zergchat release workflow contract", () => {
       promoteJob,
       /actions\/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02/,
     );
+    assert.match(promoteJob, /name: github-pages/);
+    assert.match(deployBlock, /run: node scripts\/deploy-pages\.mjs/);
     assert.match(
       promoteJob,
       /pages_artifact_id: \$\{\{ steps\.pages-artifact\.outputs\.artifact-id \}\}/,

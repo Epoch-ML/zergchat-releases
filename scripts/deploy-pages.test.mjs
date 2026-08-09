@@ -200,6 +200,7 @@ test("terminal Pages states and repeated status failures fail closed", async () 
   for (const [status, message] of [
     ["deployment_failed", "deployment failed"],
     ["deployment_content_failed", "deployment content failed validation"],
+    ["deployment_perms_error", "deployment permission check failed"],
     ["deployment_cancelled", "deployment was cancelled"],
     ["deployment_lost", "deployment stopped reporting status"],
   ]) {
@@ -207,6 +208,14 @@ test("terminal Pages states and repeated status failures fail closed", async () 
     await assert.rejects(
       deployPages(deploymentOptions(), terminal.dependencies),
       new RegExp(`Pages deployment ${DEPLOYMENT_ID} ${message}`),
+    );
+    assert.equal(terminal.elapsed(), 0, `${status} must fail before polling again`);
+    assert.equal(
+      terminal.requests.filter(
+        (request) => request.method === "GET" && request.url !== OIDC_URL,
+      ).length,
+      1,
+      `${status} must stop after its first terminal response`,
     );
   }
 
