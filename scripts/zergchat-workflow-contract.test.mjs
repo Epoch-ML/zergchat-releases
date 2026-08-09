@@ -93,14 +93,18 @@ describe("ZergChat source-build release contract", () => {
     }
 
     const sourceGateIndex = build.steps.indexOf(sourceGate);
-    const appBuildIndex = build.steps.indexOf(requireStep(
+    const appBuild = requireStep(
       build,
       "Build the unsigned app without release signing credentials",
-    ));
+    );
+    const appBuildIndex = build.steps.indexOf(appBuild);
     assert.ok(
       sourceGateIndex >= 0 && appBuildIndex > sourceGateIndex,
       "the verified native frontend must pass its source gate before Tauri builds it",
     );
+    assert.deepEqual(appBuild.env, {
+      NUXT_PUBLIC_API_BASE_URL: "https://zergchat.com",
+    });
   });
 
   it("binds source media capabilities to public bytes before source execution", () => {
@@ -137,6 +141,8 @@ describe("ZergChat source-build release contract", () => {
     }
     for (const token of [
       "source/zapps/zergchat/src-tauri/tauri.conf.json",
+      "config.build.beforeBuildCommand",
+      "npm run generate && npm run verify:native-release-footprint",
       "config.bundle.macOS.entitlements",
       "Entitlements.plist",
       "config.bundle.macOS.infoPlist",
