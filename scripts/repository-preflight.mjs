@@ -755,7 +755,7 @@ export function auditRepositoryState(state, { phase } = {}) {
 
   const rulesets = Array.isArray(release.rulesets) ? release.rulesets : [];
   const expectedRulesetNames = new Set(EXPECTED_RULESETS.map(({ name }) => name));
-  const actualRulesetNames = rulesets.map(({ name }) => name);
+  const actualRulesetNames = rulesets.map((ruleset) => ruleset?.name);
   if (
     actualRulesetNames.some((name) => !expectedRulesetNames.has(name)) ||
     new Set(actualRulesetNames).size !== actualRulesetNames.length
@@ -766,7 +766,7 @@ export function auditRepositoryState(state, { phase } = {}) {
     ));
   }
   for (const expected of EXPECTED_RULESETS) {
-    const actual = rulesets.find((ruleset) => ruleset.name === expected.name);
+    const actual = rulesets.find((ruleset) => ruleset?.name === expected.name);
     if (!rulesetMatches(actual, expected)) {
       errors.push(diagnostic(
         "ruleset-contract",
@@ -807,7 +807,7 @@ export function auditRepositoryState(state, { phase } = {}) {
     }
   }
   const reviewed = rulesets.find(
-    (ruleset) => ruleset.name === "Reviewed release requests",
+    (ruleset) => ruleset?.name === "Reviewed release requests",
   );
   if (reviewed?.bypass?.includes(HUMAN_BYPASS)) {
     warnings.push(diagnostic(
