@@ -660,6 +660,27 @@ test("malformed ruleset elements return controlled public diagnostics", () => {
   }
 });
 
+test("malformed release rulesets cannot interrupt later public diagnostics", () => {
+  const reviewedIndex = idealState().release.rulesets.findIndex(
+    ({ name }) => name === "Reviewed release requests",
+  );
+  for (const [label, index] of [
+    ["first entry", 0],
+    ["before reviewed rule", reviewedIndex],
+  ]) {
+    const state = idealState();
+    state.release.rulesets.splice(index, 0, undefined);
+    const result = auditRepositoryState(state, { phase: "cutover" });
+    assert.deepEqual({
+      errors: result.errors.map(({ code }) => code),
+      warnings: result.warnings.map(({ code }) => code),
+    }, {
+      errors: ["ruleset-contract"],
+      warnings: ["human-review-limitation"],
+    }, label);
+  }
+});
+
 test("repository-scoped release credentials are rejected independently", () => {
   const release = idealState();
   release.release.repositorySecrets.push("UNSCOPED_SIGNER");
