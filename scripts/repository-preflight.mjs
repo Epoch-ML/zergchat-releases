@@ -454,12 +454,16 @@ export function auditRepositoryState(state, { phase } = {}) {
       "the public repository must have exactly one verified feed writer key",
     ));
   }
-  const sourceKey = Array.isArray(source.deployKeys)
-    ? source.deployKeys.find((key) =>
+  const sourceKeys = Array.isArray(source.deployKeys)
+    ? source.deployKeys.filter((key) =>
       key.title.startsWith("ZergChat releases source checkout ")
     )
-    : undefined;
-  if (sourceKey?.verified !== true || sourceKey?.read_only !== true) {
+    : [];
+  if (
+    sourceKeys.length !== 1 ||
+    sourceKeys[0].verified !== true ||
+    sourceKeys[0].read_only !== true
+  ) {
     errors.push(diagnostic(
       "source-key",
       "the ZergChat source deploy key must be verified and read-only",
@@ -498,6 +502,17 @@ export function auditRepositoryState(state, { phase } = {}) {
   }
 
   const rulesets = Array.isArray(release.rulesets) ? release.rulesets : [];
+  const expectedRulesetNames = new Set(EXPECTED_RULESETS.map(({ name }) => name));
+  const actualRulesetNames = rulesets.map(({ name }) => name);
+  if (
+    actualRulesetNames.some((name) => !expectedRulesetNames.has(name)) ||
+    new Set(actualRulesetNames).size !== actualRulesetNames.length
+  ) {
+    errors.push(diagnostic(
+      "ruleset-contract",
+      "the release repository must contain exactly the reviewed rulesets",
+    ));
+  }
   for (const expected of EXPECTED_RULESETS) {
     const actual = rulesets.find((ruleset) => ruleset.name === expected.name);
     if (!rulesetMatches(actual, expected)) {
@@ -508,6 +523,21 @@ export function auditRepositoryState(state, { phase } = {}) {
     }
   }
   const sourceRulesets = Array.isArray(source.rulesets) ? source.rulesets : [];
+  const expectedSourceRulesetNames = new Set(
+    EXPECTED_SOURCE_RULESETS.map(({ name }) => name),
+  );
+  const actualSourceRulesetNames = sourceRulesets.map(({ name }) => name);
+  if (
+    actualSourceRulesetNames.some(
+      (name) => !expectedSourceRulesetNames.has(name),
+    ) ||
+    new Set(actualSourceRulesetNames).size !== actualSourceRulesetNames.length
+  ) {
+    errors.push(diagnostic(
+      "source-ruleset-contract",
+      "the source repository must contain exactly the reviewed rulesets",
+    ));
+  }
   for (const expected of EXPECTED_SOURCE_RULESETS) {
     const actual = sourceRulesets.find((ruleset) => ruleset.name === expected.name);
     if (!rulesetMatches(actual, expected)) {
@@ -848,7 +878,10 @@ export async function collectRepositoryState({
 
 async function main() {
   const phase = process.argv[2];
-  if (phase !== "cutover" && phase !== "live") {
+  if (
+    process.argv.length !== 3 ||
+    (phase !== "cutover" && phase !== "live")
+  ) {
     throw new RepositoryPreflightError(
       "usage: repository-preflight.mjs cutover|live",
     );
