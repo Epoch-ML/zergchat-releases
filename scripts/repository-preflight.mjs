@@ -223,6 +223,21 @@ function requireObject(value, description) {
   return value;
 }
 
+function requireArray(value, description) {
+  if (!Array.isArray(value)) {
+    throw new RepositoryPreflightError(`${description} must be an array`);
+  }
+  return value;
+}
+
+function requireStringArray(value, description) {
+  const values = requireArray(value, description);
+  if (values.some((item) => typeof item !== "string")) {
+    throw new RepositoryPreflightError(`${description} must contain only strings`);
+  }
+  return values;
+}
+
 function sortedStrings(values) {
   if (!Array.isArray(values) || values.some((value) => typeof value !== "string")) {
     return [];
@@ -500,7 +515,10 @@ export function auditRepositoryState(state, { phase } = {}) {
 function normalizeRule(rule) {
   if (rule.type === "pull_request") {
     const parameters = rule.parameters ?? {};
-    const methods = sortedStrings(parameters.allowed_merge_methods).join("+");
+    const methods = sortedStrings(requireStringArray(
+      parameters.allowed_merge_methods,
+      "pull-request merge methods",
+    )).join("+");
     const approvals = parameters.required_approving_review_count;
     const lastPush = parameters.require_last_push_approval === true
       ? "last-push"
@@ -512,26 +530,33 @@ function normalizeRule(rule) {
     const strict = parameters.strict_required_status_checks_policy === true
       ? "strict"
       : "non-strict";
-    const checks = Array.isArray(parameters.required_status_checks)
-      ? parameters.required_status_checks
-      : [];
-    return checks.map((check) =>
-      `required_status_checks:${check.context}:${check.integration_id}:${strict}`
+    const checks = requireArray(
+      parameters.required_status_checks,
+      "required status checks",
     );
+    return checks.map((rawCheck) => {
+      const check = requireObject(rawCheck, "required status check");
+      return `required_status_checks:${check.context}:${check.integration_id}:${strict}`;
+    });
   }
   return rule.type;
 }
 
 function normalizeRuleset(ruleset) {
-  const refs = ruleset.conditions?.ref_name?.include ?? [];
-  const bypass = Array.isArray(ruleset.bypass_actors)
-    ? ruleset.bypass_actors.map((actor) =>
-      `${actor.actor_type}:${actor.actor_id ?? "any"}`
-    )
-    : [];
-  const rules = Array.isArray(ruleset.rules)
-    ? ruleset.rules.flatMap(normalizeRule)
-    : [];
+  const refs = requireStringArray(
+    ruleset.conditions?.ref_name?.include,
+    "ruleset references",
+  );
+  const bypass = requireArray(
+    ruleset.bypass_actors,
+    "ruleset bypass actors",
+  ).map((rawActor) => {
+    const actor = requireObject(rawActor, "ruleset bypass actor");
+    return `${actor.actor_type}:${actor.actor_id ?? "any"}`;
+  });
+  const rules = requireArray(ruleset.rules, "ruleset rules")
+    .map((rule) => requireObject(rule, "ruleset rule"))
+    .flatMap(normalizeRule);
   return {
     name: ruleset.name,
     refs: sortedStrings(refs),
@@ -576,11 +601,15 @@ export async function requestGitHub({
 
 async function collectEnvironments(request, repository, response) {
   const environments = {};
-  const records = Array.isArray(response.environments) ? response.environments : [];
-  for (const record of records.sort((left, right) => left.name.localeCompare(right.name))) {
-    const protectionRules = Array.isArray(record.protection_rules)
-      ? record.protection_rules
-      : [];
+  const records = requireArray(response.environments, "repository environments");
+  for (const rawRecord of records.sort((left, right) =>
+    left.name.localeCompare(right.name)
+  )) {
+    const record = requireObject(rawRecord, "repository environment");
+    const protectionRules = requireArray(
+      record.protection_rules ?? [],
+      `${record.name} protection rules`,
+    );
     const reviewerRules = protectionRules.filter(
       (rule) => rule?.type === "required_reviewers",
     );
@@ -588,15 +617,14 @@ async function collectEnvironments(request, repository, response) {
       (rule) => rule?.type === "wait_timer",
     );
     const reviewers = reviewerRules.flatMap((rule) =>
-      Array.isArray(rule.reviewers)
-        ? rule.reviewers.flatMap((reviewer) => {
+      requireArray(rule.reviewers, `${record.name} required reviewers`)
+        .flatMap((reviewer) => {
             const type = reviewer?.type;
             const id = reviewer?.reviewer?.id;
             return typeof type === "string" && Number.isSafeInteger(id)
               ? [`${type}:${id}`]
               : [];
           })
-        : []
     );
     const preventSelfReview = reviewerRules.length === 0
       ? null
@@ -619,14 +647,19 @@ async function collectEnvironments(request, repository, response) {
       path: `environments/${encodeURIComponent(record.name)}/deployment-branch-policies`,
     });
     environments[record.name] = {
-      secrets: Array.isArray(secrets.secrets)
-        ? secrets.secrets.map((secret) => secret.name).sort()
-        : [],
-      refs: Array.isArray(policies.branch_policies)
-        ? policies.branch_policies.map((policy) =>
-          `${policy.type}:${policy.name}`
-        ).sort()
-        : [],
+      secrets: requireArray(secrets.secrets, `${record.name} secrets`)
+        .map((secret) => requireObject(secret, `${record.name} secret`).name)
+        .sort(),
+      refs: requireArray(
+        policies.branch_policies,
+        `${record.name} deployment policies`,
+      ).map((policy) => {
+        const branchPolicy = requireObject(
+          policy,
+          `${record.name} deployment policy`,
+        );
+        return `${branchPolicy.type}:${branchPolicy.name}`;
+      }).sort(),
       reviewers: reviewers.sort(),
       prevent_self_review: preventSelfReview,
       wait_timer: waitTimer,
@@ -636,7 +669,7 @@ async function collectEnvironments(request, repository, response) {
 }
 
 async function collectRulesets(request, repository, response) {
-  const summaries = Array.isArray(response) ? response : [];
+  const summaries = requireArray(response, "repository rulesets");
   const rulesets = [];
   for (const summary of summaries.sort((left, right) => left.id - right.id)) {
     const full = await request({
@@ -686,10 +719,14 @@ export async function collectRepositoryState({
       sha: commit.sha,
       tree_sha: tree.sha,
       truncated: treeDocument.truncated,
-      entries: Array.isArray(treeDocument.tree)
-        ? treeDocument.tree.map(({ path, mode, type }) => ({ path, mode, type }))
-          .sort((left, right) => left.path.localeCompare(right.path))
-        : [],
+      entries: requireArray(treeDocument.tree, "release-data tree entries")
+        .map((entry) => {
+          const { path, mode, type } = requireObject(
+            entry,
+            "release-data tree entry",
+          );
+          return { path, mode, type };
+        }).sort((left, right) => left.path.localeCompare(right.path)),
     };
   }
   const releaseWorkflows = await request({
@@ -755,25 +792,31 @@ export async function collectRepositoryState({
       immutableReleases,
       pages,
       feedBranch,
-      workflows: Array.isArray(releaseWorkflows.workflows)
-        ? releaseWorkflows.workflows.map(({ path, state }) => ({ path, state }))
-        : [],
+      workflows: requireArray(
+        releaseWorkflows.workflows,
+        "release workflows",
+      ).map(({ path, state }) => ({ path, state })),
       environments,
-      repositorySecrets: Array.isArray(repositorySecretsResponse.secrets)
-        ? repositorySecretsResponse.secrets.map((secret) => secret.name).sort()
-        : [],
-      deployKeys: Array.isArray(releaseKeys) ? releaseKeys : [],
+      repositorySecrets: requireArray(
+        repositorySecretsResponse.secrets,
+        "release repository secrets",
+      ).map((secret) => requireObject(secret, "release repository secret").name)
+        .sort(),
+      deployKeys: requireArray(releaseKeys, "release deploy keys"),
       rulesets,
     },
     source: {
-      workflows: Array.isArray(sourceWorkflows.workflows)
-        ? sourceWorkflows.workflows.map(({ path, state }) => ({ path, state }))
-        : [],
+      workflows: requireArray(
+        sourceWorkflows.workflows,
+        "source workflows",
+      ).map(({ path, state }) => ({ path, state })),
       environments: sourceEnvironments,
-      repositorySecrets: Array.isArray(sourceRepositorySecretsResponse.secrets)
-        ? sourceRepositorySecretsResponse.secrets.map((secret) => secret.name).sort()
-        : [],
-      deployKeys: Array.isArray(sourceKeys) ? sourceKeys : [],
+      repositorySecrets: requireArray(
+        sourceRepositorySecretsResponse.secrets,
+        "source repository secrets",
+      ).map((secret) => requireObject(secret, "source repository secret").name)
+        .sort(),
+      deployKeys: requireArray(sourceKeys, "source deploy keys"),
       rulesets: sourceRulesets,
     },
   };
