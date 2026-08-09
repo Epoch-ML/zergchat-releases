@@ -24,6 +24,7 @@ const requestedAt = "2026-08-06T10:22:39.000Z";
 const version = "0.2.0-preview.9";
 const releaseTag = `zergchat-preview-v${version}`;
 const releaseRepository = "Epoch-ML/zergchat-releases";
+const updaterPublicKeySha256 = "a".repeat(64);
 const temporaryDirectories = [];
 
 function request() {
@@ -34,6 +35,7 @@ function request() {
     sourceRef: `refs/tags/${releaseTag}`,
     sourceRepository: "Epoch-ML/zerg",
     sourceSha,
+    updaterPublicKeySha256,
     version,
   };
 }
@@ -41,7 +43,7 @@ function request() {
 function rawRequest() {
   return {
     schema_version: 1,
-    product: "Zergchat",
+    product: "zergchat-desktop",
     channel: "preview",
     version,
     release_tag: releaseTag,
@@ -49,6 +51,7 @@ function rawRequest() {
     source_sha: sourceSha,
     source_ref: `refs/tags/${releaseTag}`,
     requested_at: requestedAt,
+    updater_public_key_sha256: updaterPublicKeySha256,
   };
 }
 

@@ -14,9 +14,13 @@ const ALLOWED_FIELDS = new Set([
   "source_sha",
   "source_ref",
   "requested_at",
+  "updater_public_key_sha256",
 ]);
 const SOURCE_SHA_PATTERN = /^[0-9a-f]{40}$/;
-const SEMVER_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
+const UPDATER_PUBLIC_KEY_SHA256_PATTERN = /^[0-9a-f]{64}$/;
+const CORE_VERSION = "(?:0|[1-9]\\d*)\\.(?:0|[1-9]\\d*)\\.(?:0|[1-9]\\d*)";
+const STABLE_VERSION_PATTERN = new RegExp(`^${CORE_VERSION}$`);
+const PREVIEW_VERSION_PATTERN = new RegExp(`^${CORE_VERSION}-preview\\.(?:[1-9]\\d*)$`);
 
 export class ReleaseRequestError extends Error {
   constructor(message) {
@@ -51,23 +55,22 @@ export function validateReleaseRequest(request, { requestFilename } = {}) {
   if (request.schema_version !== 1) {
     throw new ReleaseRequestError("schema version must be 1");
   }
-  if (request.product !== "Zergchat") {
-    throw new ReleaseRequestError("product must be Zergchat");
+  if (request.product !== "zergchat-desktop") {
+    throw new ReleaseRequestError("product must be zergchat-desktop");
   }
   if (request.channel !== "preview" && request.channel !== "stable") {
     throw new ReleaseRequestError("channel must be preview or stable");
   }
 
   const version = requireString(request.version, "version is required");
-  const semver = SEMVER_PATTERN.exec(version);
-  if (semver === null) {
-    throw new ReleaseRequestError(
-      "version must be strict SemVer without a v prefix",
-    );
-  }
-  if (request.channel === "stable" && (semver[4] !== undefined || semver[5] !== undefined)) {
+  if (request.channel === "stable" && !STABLE_VERSION_PATTERN.test(version)) {
     throw new ReleaseRequestError(
       "stable release versions must use MAJOR.MINOR.PATCH",
+    );
+  }
+  if (request.channel === "preview" && !PREVIEW_VERSION_PATTERN.test(version)) {
+    throw new ReleaseRequestError(
+      "preview release versions must use MAJOR.MINOR.PATCH-preview.N",
     );
   }
 
@@ -104,6 +107,12 @@ export function validateReleaseRequest(request, { requestFilename } = {}) {
     );
   }
 
+  if (!UPDATER_PUBLIC_KEY_SHA256_PATTERN.test(request.updater_public_key_sha256)) {
+    throw new ReleaseRequestError(
+      "updater public key SHA-256 must contain exactly 64 lowercase hexadecimal characters",
+    );
+  }
+
   const expectedFilename = `${expectedTag}.json`;
   if (requestFilename !== undefined && requestFilename !== expectedFilename) {
     throw new ReleaseRequestError(
@@ -118,6 +127,7 @@ export function validateReleaseRequest(request, { requestFilename } = {}) {
     sourceRef: expectedRef,
     sourceRepository: request.source_repository,
     sourceSha: request.source_sha,
+    updaterPublicKeySha256: request.updater_public_key_sha256,
     version,
   };
 }
@@ -155,6 +165,7 @@ async function main() {
       `source_ref=${request.sourceRef}`,
       `source_repository=${request.sourceRepository}`,
       `source_sha=${request.sourceSha}`,
+      `updater_public_key_sha256=${request.updaterPublicKeySha256}`,
       `version=${request.version}`,
     ].join("\n");
     await appendFile(process.env.GITHUB_OUTPUT, `${outputs}\n`);
