@@ -17,7 +17,8 @@
     "tar": "7.5.22"
   },
   "devDependencies": {
-    "@stryker-mutator/core": "9.6.1"
+    "@stryker-mutator/core": "9.6.1",
+    "yaml": "2.9.0"
   },
   "overrides": {
     "qs": "6.15.3"
