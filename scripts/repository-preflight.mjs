@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
 
 const RELEASE_REPOSITORY = "Epoch-ML/zergchat-releases";
@@ -10,6 +11,30 @@ const SOURCE_WORKFLOW = ".github/workflows/zergchat-native-release.yml";
 const SOURCE_POLICY_ANCHOR =
   ".github/workflows/zergchat-release-policy-anchor.yml";
 const CANONICAL_PAGES_URL = "https://epoch-ml.github.io/zergchat-releases/";
+const EXPECTED_RELEASE_REPOSITORY = Object.freeze({
+  full_name: RELEASE_REPOSITORY,
+  private: false,
+  archived: false,
+  default_branch: "main",
+});
+const EXPECTED_SOURCE_REPOSITORY = Object.freeze({
+  full_name: SOURCE_REPOSITORY,
+  private: true,
+  archived: false,
+  default_branch: "development",
+});
+const EXPECTED_FEED_KEY = Object.freeze({
+  title: "ZergChat release feed writer 2026",
+  read_only: false,
+  verified: true,
+  fingerprint: "SHA256:WgAMaidO5b4glq5CemIrWykgwMjz7Z+QYAHF6Difsw4",
+});
+const EXPECTED_SOURCE_KEY = Object.freeze({
+  title: "ZergChat releases source checkout 2026",
+  read_only: true,
+  verified: true,
+  fingerprint: "SHA256:vJ7KXRTcw6ZbFh1Aiiwoto+GxnEDRW4+hFg9oUFEPpI",
+});
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const MAX_RELEASE_DATA_ENTRIES = 4_096;
 const MAX_RELEASE_DATA_FILE_BYTES = 1_048_576;
@@ -43,6 +68,15 @@ const ALLOWED_FIXED_RELEASE_DATA_BLOBS = new Set([
   "preview/latest.json",
   "stable/latest.json",
 ]);
+const HUMAN_BYPASS = "User:1042757:always";
+const REVIEWED_PULL_REQUEST_RULE =
+  "pull_request:rebase:1:dismiss-stale:optional-code-owner:last-push:resolve-threads";
+const RELEASE_STATUS_RULE =
+  "required_status_checks:strict:on-create:Protected-base release policy:15368";
+const SOURCE_ZERGLANG_STATUS_RULE =
+  "required_status_checks:strict:on-create:Protected-base ZergLang release policy:15368";
+const SOURCE_ZERGCHAT_STATUS_RULE =
+  "required_status_checks:strict:on-create:Protected-base ZergChat release policy:15368";
 
 const EXPECTED_ENVIRONMENTS = Object.freeze({
   "zergchat-preview-build": Object.freeze({
@@ -119,53 +153,67 @@ const EXPECTED_ENVIRONMENTS = Object.freeze({
 const EXPECTED_RULESETS = Object.freeze([
   Object.freeze({
     name: "Release branch authority",
-    refs: Object.freeze(["refs/heads/main"]),
-    bypass: Object.freeze(["User:1042757"]),
+    target: "branch",
+    include: Object.freeze(["refs/heads/main"]),
+    exclude: Object.freeze([]),
+    bypass: Object.freeze([HUMAN_BYPASS]),
     rules: Object.freeze(["creation", "update"]),
   }),
   Object.freeze({
     name: "Release branch history",
-    refs: Object.freeze(["refs/heads/main"]),
+    target: "branch",
+    include: Object.freeze(["refs/heads/main"]),
+    exclude: Object.freeze([]),
     bypass: Object.freeze([]),
     rules: Object.freeze(["deletion", "non_fast_forward"]),
   }),
   Object.freeze({
     name: "Reviewed release requests",
-    refs: Object.freeze(["refs/heads/main"]),
-    bypass: Object.freeze(["User:1042757"]),
+    target: "branch",
+    include: Object.freeze(["refs/heads/main"]),
+    exclude: Object.freeze([]),
+    bypass: Object.freeze([HUMAN_BYPASS]),
     rules: Object.freeze([
-      "pull_request:rebase:1:last-push",
+      REVIEWED_PULL_REQUEST_RULE,
       "required_linear_history",
-      "required_status_checks:Protected-base release policy:15368:strict",
+      RELEASE_STATUS_RULE,
     ]),
   }),
   Object.freeze({
     name: "ZergChat feed authority",
-    refs: Object.freeze(["refs/heads/release-data"]),
-    bypass: Object.freeze(["DeployKey:any"]),
+    target: "branch",
+    include: Object.freeze(["refs/heads/release-data"]),
+    exclude: Object.freeze([]),
+    bypass: Object.freeze(["DeployKey:any:always"]),
     rules: Object.freeze(["creation", "update"]),
   }),
   Object.freeze({
     name: "ZergChat feed history",
-    refs: Object.freeze(["refs/heads/release-data"]),
+    target: "branch",
+    include: Object.freeze(["refs/heads/release-data"]),
+    exclude: Object.freeze([]),
     bypass: Object.freeze([]),
     rules: Object.freeze(["deletion", "non_fast_forward"]),
   }),
   Object.freeze({
     name: "Release tag authority",
-    refs: Object.freeze([
+    target: "tag",
+    include: Object.freeze([
       "refs/tags/zergchat-preview-v*",
       "refs/tags/zergchat-v*",
     ]),
-    bypass: Object.freeze(["User:1042757"]),
+    exclude: Object.freeze([]),
+    bypass: Object.freeze([HUMAN_BYPASS]),
     rules: Object.freeze(["creation"]),
   }),
   Object.freeze({
     name: "Release tag immutability",
-    refs: Object.freeze([
+    target: "tag",
+    include: Object.freeze([
       "refs/tags/zergchat-preview-v*",
       "refs/tags/zergchat-v*",
     ]),
+    exclude: Object.freeze([]),
     bypass: Object.freeze([]),
     rules: Object.freeze(["deletion", "update"]),
   }),
@@ -174,30 +222,37 @@ const EXPECTED_RULESETS = Object.freeze([
 const EXPECTED_SOURCE_RULESETS = Object.freeze([
   Object.freeze({
     name: "Development branch authority",
-    refs: Object.freeze(["refs/heads/development"]),
-    bypass: Object.freeze(["User:1042757"]),
+    target: "branch",
+    include: Object.freeze(["refs/heads/development"]),
+    exclude: Object.freeze([]),
+    bypass: Object.freeze([HUMAN_BYPASS]),
     rules: Object.freeze(["creation", "update"]),
   }),
   Object.freeze({
     name: "Development branch history",
-    refs: Object.freeze(["refs/heads/development"]),
+    target: "branch",
+    include: Object.freeze(["refs/heads/development"]),
+    exclude: Object.freeze([]),
     bypass: Object.freeze([]),
     rules: Object.freeze(["deletion", "non_fast_forward"]),
   }),
   Object.freeze({
     name: "Reviewed development changes",
-    refs: Object.freeze(["refs/heads/development"]),
-    bypass: Object.freeze(["User:1042757"]),
+    target: "branch",
+    include: Object.freeze(["refs/heads/development"]),
+    exclude: Object.freeze([]),
+    bypass: Object.freeze([HUMAN_BYPASS]),
     rules: Object.freeze([
-      "pull_request:rebase:1:last-push",
+      REVIEWED_PULL_REQUEST_RULE,
       "required_linear_history",
-      "required_status_checks:Protected-base ZergLang release policy:15368:strict",
-      "required_status_checks:Protected-base ZergChat release policy:15368:strict",
+      SOURCE_ZERGLANG_STATUS_RULE,
+      SOURCE_ZERGCHAT_STATUS_RULE,
     ]),
   }),
   Object.freeze({
     name: "Desktop release tag authority",
-    refs: Object.freeze([
+    target: "tag",
+    include: Object.freeze([
       "refs/tags/colony-desktop-preview-v*",
       "refs/tags/colony-desktop-v*",
       "refs/tags/zde-preview-v*",
@@ -209,12 +264,14 @@ const EXPECTED_SOURCE_RULESETS = Object.freeze([
       "refs/tags/zterm-preview-v*",
       "refs/tags/zterm-v*",
     ]),
-    bypass: Object.freeze(["User:1042757"]),
+    exclude: Object.freeze([]),
+    bypass: Object.freeze([HUMAN_BYPASS]),
     rules: Object.freeze(["creation"]),
   }),
   Object.freeze({
     name: "Desktop release tag immutability",
-    refs: Object.freeze([
+    target: "tag",
+    include: Object.freeze([
       "refs/tags/colony-desktop-preview-v*",
       "refs/tags/colony-desktop-v*",
       "refs/tags/zde-preview-v*",
@@ -226,6 +283,7 @@ const EXPECTED_SOURCE_RULESETS = Object.freeze([
       "refs/tags/zterm-preview-v*",
       "refs/tags/zterm-v*",
     ]),
+    exclude: Object.freeze([]),
     bypass: Object.freeze([]),
     rules: Object.freeze(["deletion", "update"]),
   }),
@@ -271,6 +329,27 @@ function requireStringArray(value, description) {
   return values;
 }
 
+function requireString(value, description) {
+  if (typeof value !== "string" || value.length === 0) {
+    throw new RepositoryPreflightError(`${description} must be a non-empty string`);
+  }
+  return value;
+}
+
+function requireBoolean(value, description) {
+  if (typeof value !== "boolean") {
+    throw new RepositoryPreflightError(`${description} must be a boolean`);
+  }
+  return value;
+}
+
+function requireSafeInteger(value, description) {
+  if (!Number.isSafeInteger(value)) {
+    throw new RepositoryPreflightError(`${description} must be a safe integer`);
+  }
+  return value;
+}
+
 function sortedStrings(values) {
   if (!Array.isArray(values) || values.some((value) => typeof value !== "string")) {
     return [];
@@ -305,18 +384,48 @@ function findWorkflow(workflows, path) {
 
 function rulesetMatches(actual, expected) {
   return actual !== undefined &&
-    equalStrings(actual.refs, expected.refs) &&
+    actual.target === expected.target &&
+    equalStrings(actual.include, expected.include) &&
+    equalStrings(actual.exclude, expected.exclude) &&
     equalStrings(actual.bypass, expected.bypass) &&
     equalStrings(actual.rules, expected.rules);
 }
 
 function environmentMatches(actual, expected) {
+  const expectedProtectionRules = [
+    "branch_policy",
+    ...(expected.reviewers.length > 0 ? ["required_reviewers"] : []),
+    ...(expected.wait_timer === null ? [] : ["wait_timer"]),
+  ];
   return actual !== undefined &&
     equalStrings(actual.secrets, expected.secrets) &&
     equalStrings(actual.refs, expected.refs) &&
     equalStrings(actual.reviewers, expected.reviewers) &&
     actual.prevent_self_review === expected.prevent_self_review &&
-    actual.wait_timer === expected.wait_timer;
+    actual.wait_timer === expected.wait_timer &&
+    equalStrings(actual.protection_rules, expectedProtectionRules) &&
+    actual.deployment_branch_policy?.protected_branches === false &&
+    actual.deployment_branch_policy?.custom_branch_policies === true;
+}
+
+function repositoryMatches(actual, expected) {
+  return actual !== null &&
+    typeof actual === "object" &&
+    !Array.isArray(actual) &&
+    actual.full_name === expected.full_name &&
+    actual.private === expected.private &&
+    actual.archived === expected.archived &&
+    actual.default_branch === expected.default_branch;
+}
+
+function deployKeyMatches(actual, expected) {
+  return actual !== null &&
+    typeof actual === "object" &&
+    !Array.isArray(actual) &&
+    actual.title === expected.title &&
+    actual.read_only === expected.read_only &&
+    actual.verified === expected.verified &&
+    actual.fingerprint === expected.fingerprint;
 }
 
 function isBoundedFeedBranch(feedBranch, { requireChannel }) {
@@ -424,6 +533,19 @@ export function auditRepositoryState(state, { phase } = {}) {
   const warnings = [];
   const expectedWorkflowState = phase === "cutover" ? "disabled_manually" : "active";
 
+  if (!repositoryMatches(release.repository, EXPECTED_RELEASE_REPOSITORY)) {
+    errors.push(diagnostic(
+      "repository-contract",
+      "the release repository must be public, active, and default to main",
+    ));
+  }
+  if (!repositoryMatches(source.repository, EXPECTED_SOURCE_REPOSITORY)) {
+    errors.push(diagnostic(
+      "source-repository-contract",
+      "the source repository must be private, active, and default to development",
+    ));
+  }
+
   if (release.immutableReleases?.enabled !== true) {
     errors.push(diagnostic(
       "immutable-releases",
@@ -527,33 +649,37 @@ export function auditRepositoryState(state, { phase } = {}) {
     }
   }
 
-  const writableKeys = Array.isArray(release.deployKeys)
-    ? release.deployKeys.filter((key) => key.read_only === false)
-    : [];
   if (
-    writableKeys.length !== 1 ||
-    writableKeys[0].verified !== true ||
-    !writableKeys[0].title.startsWith("ZergChat release feed writer ")
+    !Array.isArray(release.deployKeys) ||
+    release.deployKeys.length !== 1 ||
+    !deployKeyMatches(release.deployKeys[0], EXPECTED_FEED_KEY)
   ) {
     errors.push(diagnostic(
       "deploy-key",
       "the public repository must have exactly one verified feed writer key",
     ));
   }
-  const sourceKeys = Array.isArray(source.deployKeys)
-    ? source.deployKeys.filter((key) =>
-      key.title.startsWith("ZergChat releases source checkout ")
-    )
-    : [];
   if (
-    sourceKeys.length !== 1 ||
-    sourceKeys[0].verified !== true ||
-    sourceKeys[0].read_only !== true
+    !Array.isArray(source.deployKeys)
   ) {
     errors.push(diagnostic(
       "source-key",
       "the ZergChat source deploy key must be verified and read-only",
     ));
+  } else {
+    const zergchatSourceKeys = source.deployKeys.filter((key) =>
+      typeof key?.title === "string" &&
+      key.title.startsWith("ZergChat releases source checkout ")
+    );
+    if (
+      zergchatSourceKeys.length !== 1 ||
+      !deployKeyMatches(zergchatSourceKeys[0], EXPECTED_SOURCE_KEY)
+    ) {
+      errors.push(diagnostic(
+        "source-key",
+        "the ZergChat source deploy key must be verified and read-only",
+      ));
+    }
   }
   const sourceEnvironments = requireObject(
     source.environments,
@@ -612,21 +738,25 @@ export function auditRepositoryState(state, { phase } = {}) {
   const expectedSourceRulesetNames = new Set(
     EXPECTED_SOURCE_RULESETS.map(({ name }) => name),
   );
-  const actualSourceRulesetNames = sourceRulesets.map(({ name }) => name);
-  if (
-    actualSourceRulesetNames.some(
-      (name) => !expectedSourceRulesetNames.has(name),
-    ) ||
-    new Set(actualSourceRulesetNames).size !== actualSourceRulesetNames.length
-  ) {
+  const scopedSourceRulesets = sourceRulesets.filter(({ name }) =>
+    expectedSourceRulesetNames.has(name)
+  );
+  const sourceRulesetNamesAreUnique = EXPECTED_SOURCE_RULESETS.every(
+    ({ name }) => scopedSourceRulesets.filter(
+      (ruleset) => ruleset.name === name,
+    ).length === 1,
+  );
+  if (!sourceRulesetNamesAreUnique) {
     errors.push(diagnostic(
       "source-ruleset-contract",
-      "the source repository must contain exactly the reviewed rulesets",
+      "the source repository must contain one of each reviewed ZergChat ruleset",
     ));
   }
   for (const expected of EXPECTED_SOURCE_RULESETS) {
-    const actual = sourceRulesets.find((ruleset) => ruleset.name === expected.name);
-    if (!rulesetMatches(actual, expected)) {
+    const matches = scopedSourceRulesets.filter(
+      (ruleset) => ruleset.name === expected.name,
+    );
+    if (matches.length === 1 && !rulesetMatches(matches[0], expected)) {
       errors.push(diagnostic(
         "source-ruleset-contract",
         `${expected.name} differs from the cutover contract`,
@@ -636,7 +766,7 @@ export function auditRepositoryState(state, { phase } = {}) {
   const reviewed = rulesets.find(
     (ruleset) => ruleset.name === "Reviewed release requests",
   );
-  if (reviewed?.bypass?.includes("User:1042757")) {
+  if (reviewed?.bypass?.includes(HUMAN_BYPASS)) {
     warnings.push(diagnostic(
       "human-review-limitation",
       "Idan retains review bypass until a second trusted human is available",
@@ -654,55 +784,172 @@ export function auditRepositoryState(state, { phase } = {}) {
 
 function normalizeRule(rule) {
   if (rule.type === "pull_request") {
-    const parameters = rule.parameters ?? {};
+    const parameters = requireObject(
+      rule.parameters,
+      "pull-request rule parameters",
+    );
     const methods = sortedStrings(requireStringArray(
       parameters.allowed_merge_methods,
       "pull-request merge methods",
     )).join("+");
-    const approvals = parameters.required_approving_review_count;
-    const lastPush = parameters.require_last_push_approval === true
+    const approvals = requireSafeInteger(
+      parameters.required_approving_review_count,
+      "pull-request approval count",
+    );
+    const stale = requireBoolean(
+      parameters.dismiss_stale_reviews_on_push,
+      "pull-request stale-review policy",
+    ) ? "dismiss-stale" : "keep-stale";
+    const codeOwner = requireBoolean(
+      parameters.require_code_owner_review,
+      "pull-request code-owner policy",
+    ) ? "require-code-owner" : "optional-code-owner";
+    const lastPush = requireBoolean(
+      parameters.require_last_push_approval,
+      "pull-request last-push policy",
+    )
       ? "last-push"
       : "no-last-push";
-    return `pull_request:${methods}:${approvals}:${lastPush}`;
+    const threads = requireBoolean(
+      parameters.required_review_thread_resolution,
+      "pull-request review-thread policy",
+    ) ? "resolve-threads" : "unresolved-threads";
+    return `pull_request:${methods}:${approvals}:${stale}:${codeOwner}:` +
+      `${lastPush}:${threads}`;
   }
   if (rule.type === "required_status_checks") {
-    const parameters = rule.parameters ?? {};
-    const strict = parameters.strict_required_status_checks_policy === true
+    const parameters = requireObject(
+      rule.parameters,
+      "required-status-check parameters",
+    );
+    const strict = requireBoolean(
+      parameters.strict_required_status_checks_policy,
+      "strict status-check policy",
+    )
       ? "strict"
       : "non-strict";
+    const creation = requireBoolean(
+      parameters.do_not_enforce_on_create,
+      "status-check creation policy",
+    ) ? "skip-create" : "on-create";
     const checks = requireArray(
       parameters.required_status_checks,
       "required status checks",
     );
     return checks.map((rawCheck) => {
       const check = requireObject(rawCheck, "required status check");
-      return `required_status_checks:${check.context}:${check.integration_id}:${strict}`;
+      const context = requireString(check.context, "required status-check context");
+      const integrationId = requireSafeInteger(
+        check.integration_id,
+        "required status-check integration ID",
+      );
+      return `required_status_checks:${strict}:${creation}:` +
+        `${context}:${integrationId}`;
     });
+  }
+  if (rule.type === "update") {
+    if (Object.hasOwn(rule, "parameters")) {
+      throw new RepositoryPreflightError(
+        "repository update rule must not define unreviewed parameters",
+      );
+    }
+    return "update";
   }
   return rule.type;
 }
 
 function normalizeRuleset(ruleset) {
-  const refs = requireStringArray(
-    ruleset.conditions?.ref_name?.include,
-    "ruleset references",
+  const conditions = requireObject(ruleset.conditions, "ruleset conditions");
+  const refName = requireObject(conditions.ref_name, "ruleset ref-name conditions");
+  const include = requireStringArray(
+    refName.include,
+    "ruleset included references",
+  );
+  const exclude = requireStringArray(
+    refName.exclude,
+    "ruleset excluded references",
   );
   const bypass = requireArray(
     ruleset.bypass_actors,
     "ruleset bypass actors",
   ).map((rawActor) => {
     const actor = requireObject(rawActor, "ruleset bypass actor");
-    return `${actor.actor_type}:${actor.actor_id ?? "any"}`;
+    const actorType = requireString(actor.actor_type, "ruleset bypass actor type");
+    const actorId = actor.actor_id === null
+      ? "any"
+      : requireSafeInteger(actor.actor_id, "ruleset bypass actor ID");
+    const bypassMode = requireString(
+      actor.bypass_mode,
+      "ruleset bypass mode",
+    );
+    return `${actorType}:${actorId}:${bypassMode}`;
   });
   const rules = requireArray(ruleset.rules, "ruleset rules")
     .map((rule) => requireObject(rule, "ruleset rule"))
     .flatMap(normalizeRule);
   return {
-    name: ruleset.name,
-    refs: sortedStrings(refs),
+    name: requireString(ruleset.name, "ruleset name"),
+    target: requireString(ruleset.target, "ruleset target"),
+    include: sortedStrings(include),
+    exclude: sortedStrings(exclude),
     bypass: sortedStrings(bypass),
     rules: sortedStrings(rules),
   };
+}
+
+function normalizeRepositoryMetadata(document, description) {
+  const metadata = requireObject(document, description);
+  return {
+    full_name: requireString(metadata.full_name, `${description} full name`),
+    private: requireBoolean(metadata.private, `${description} private state`),
+    archived: requireBoolean(metadata.archived, `${description} archived state`),
+    default_branch: requireString(
+      metadata.default_branch,
+      `${description} default branch`,
+    ),
+  };
+}
+
+function sshPublicKeyFingerprint(value, description) {
+  const publicKey = requireString(value, description);
+  const fields = publicKey.trim().split(/\s+/);
+  if (fields.length < 2 || fields.length > 3 || fields[0] !== "ssh-ed25519") {
+    throw new RepositoryPreflightError(`${description} must be one Ed25519 public key`);
+  }
+  const encoded = fields[1];
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) {
+    throw new RepositoryPreflightError(`${description} must use canonical base64`);
+  }
+  const bytes = Buffer.from(encoded, "base64");
+  if (bytes.toString("base64") !== encoded || bytes.length !== 51) {
+    throw new RepositoryPreflightError(`${description} has invalid key bytes`);
+  }
+  const algorithmLength = bytes.readUInt32BE(0);
+  const algorithmEnd = 4 + algorithmLength;
+  if (
+    algorithmLength !== 11 ||
+    bytes.subarray(4, algorithmEnd).toString("utf8") !== "ssh-ed25519" ||
+    bytes.readUInt32BE(algorithmEnd) !== 32 ||
+    algorithmEnd + 4 + 32 !== bytes.length
+  ) {
+    throw new RepositoryPreflightError(`${description} has invalid Ed25519 framing`);
+  }
+  return `SHA256:${createHash("sha256").update(bytes).digest("base64").replace(/=+$/, "")}`;
+}
+
+function normalizeDeployKeys(value, description) {
+  return requireArray(value, description).map((rawKey) => {
+    const key = requireObject(rawKey, `${description} entry`);
+    return {
+      title: requireString(key.title, `${description} title`),
+      verified: requireBoolean(key.verified, `${description} verified state`),
+      read_only: requireBoolean(key.read_only, `${description} read-only state`),
+      fingerprint: sshPublicKeyFingerprint(
+        key.key,
+        `${description} public key`,
+      ),
+    };
+  });
 }
 
 function repositoryResourceUrl(repository, path) {
@@ -874,7 +1121,7 @@ async function collectEnvironments(request, repository, response) {
     const protectionRules = requireArray(
       record.protection_rules ?? [],
       `${record.name} protection rules`,
-    );
+    ).map((rule) => requireObject(rule, `${record.name} protection rule`));
     const reviewerRules = protectionRules.filter(
       (rule) => rule?.type === "required_reviewers",
     );
@@ -915,6 +1162,10 @@ async function collectEnvironments(request, repository, response) {
           Number.isSafeInteger(waitTimerRules[0].wait_timer)
         ? waitTimerRules[0].wait_timer
         : "invalid";
+    const deploymentBranchPolicy = requireObject(
+      record.deployment_branch_policy,
+      `${record.name} deployment branch policy`,
+    );
     const secrets = await request({
       repository,
       path: `environments/${encodeURIComponent(record.name)}/secrets`,
@@ -942,13 +1193,33 @@ async function collectEnvironments(request, repository, response) {
       reviewers: reviewers.sort(),
       prevent_self_review: preventSelfReview,
       wait_timer: waitTimer,
+      protection_rules: protectionRules.map((rule) =>
+        requireString(rule.type, `${record.name} protection rule type`)
+      ).sort(),
+      deployment_branch_policy: {
+        protected_branches: requireBoolean(
+          deploymentBranchPolicy.protected_branches,
+          `${record.name} protected-branches policy`,
+        ),
+        custom_branch_policies: requireBoolean(
+          deploymentBranchPolicy.custom_branch_policies,
+          `${record.name} custom-branch policy`,
+        ),
+      },
     };
   }
   return environments;
 }
 
 async function collectRulesets(request, repository, response) {
-  const summaries = requireArray(response, "repository rulesets");
+  const summaries = requireArray(response, "repository rulesets")
+    .map((summary) => requireObject(summary, "repository ruleset summary"));
+  for (const summary of summaries) {
+    requireSafeInteger(summary.id, "repository ruleset ID");
+  }
+  if (new Set(summaries.map(({ id }) => id)).size !== summaries.length) {
+    throw new RepositoryPreflightError("repository ruleset IDs must be unique");
+  }
   const rulesets = [];
   for (const summary of summaries.sort((left, right) => left.id - right.id)) {
     const full = await request({
@@ -968,6 +1239,10 @@ export async function collectRepositoryState({
   if (typeof request !== "function") {
     throw new RepositoryPreflightError("request must be a function");
   }
+  const releaseMetadata = await request({
+    repository: releaseRepository,
+    path: "",
+  });
   const immutableReleases = await request({
     repository: releaseRepository,
     path: "immutable-releases",
@@ -1045,6 +1320,10 @@ export async function collectRepositoryState({
     releaseRepository,
     rulesetResponse,
   );
+  const sourceMetadata = await request({
+    repository: sourceRepository,
+    path: "",
+  });
   const sourceWorkflows = await request({
     repository: sourceRepository,
     path: "actions/workflows",
@@ -1083,6 +1362,10 @@ export async function collectRepositoryState({
 
   return {
     release: {
+      repository: normalizeRepositoryMetadata(
+        releaseMetadata,
+        "release repository metadata",
+      ),
       immutableReleases,
       pages,
       feedBranch,
@@ -1096,10 +1379,14 @@ export async function collectRepositoryState({
         "release repository secrets",
       ).map((secret) => requireObject(secret, "release repository secret").name)
         .sort(),
-      deployKeys: requireArray(releaseKeys, "release deploy keys"),
+      deployKeys: normalizeDeployKeys(releaseKeys, "release deploy keys"),
       rulesets,
     },
     source: {
+      repository: normalizeRepositoryMetadata(
+        sourceMetadata,
+        "source repository metadata",
+      ),
       workflows: requireArray(
         sourceWorkflows.workflows,
         "source workflows",
@@ -1110,7 +1397,7 @@ export async function collectRepositoryState({
         "source repository secrets",
       ).map((secret) => requireObject(secret, "source repository secret").name)
         .sort(),
-      deployKeys: requireArray(sourceKeys, "source deploy keys"),
+      deployKeys: normalizeDeployKeys(sourceKeys, "source deploy keys"),
       rulesets: sourceRulesets,
     },
   };
