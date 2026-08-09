@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
@@ -20,8 +21,39 @@ const preflightCli = fileURLToPath(
 
 const reviewer = "User:1042757";
 const mainRef = ["branch:main"];
+const feedWriterFingerprint =
+  "SHA256:WgAMaidO5b4glq5CemIrWykgwMjz7Z+QYAHF6Difsw4";
+const sourceReaderFingerprint =
+  "SHA256:vJ7KXRTcw6ZbFh1Aiiwoto+GxnEDRW4+hFg9oUFEPpI";
+const testDeployKeyBlob = (() => {
+  const algorithm = Buffer.from("ssh-ed25519");
+  const bytes = Buffer.alloc(4 + algorithm.length + 4 + 32, 7);
+  bytes.writeUInt32BE(algorithm.length, 0);
+  algorithm.copy(bytes, 4);
+  bytes.writeUInt32BE(32, 4 + algorithm.length);
+  return bytes;
+})();
+const testDeployPublicKey =
+  `ssh-ed25519 ${testDeployKeyBlob.toString("base64")} test-only`;
+const testDeployFingerprint =
+  `SHA256:${createHash("sha256").update(testDeployKeyBlob).digest("base64").replace(/=+$/, "")}`;
 
-const environments = {
+function addEnvironmentProtection(environment) {
+  return {
+    ...environment,
+    protection_rules: [
+      "branch_policy",
+      ...(environment.reviewers.length > 0 ? ["required_reviewers"] : []),
+      ...(environment.wait_timer === null ? [] : ["wait_timer"]),
+    ],
+    deployment_branch_policy: {
+      protected_branches: false,
+      custom_branch_policies: true,
+    },
+  };
+}
+
+const environments = Object.fromEntries(Object.entries({
   "zergchat-preview-build": {
     secrets: ["ZERG_SOURCE_DEPLOY_KEY"], refs: mainRef,
     reviewers: [reviewer], prevent_self_review: false, wait_timer: null,
@@ -70,7 +102,7 @@ const environments = {
     secrets: [], refs: mainRef, reviewers: [],
     prevent_self_review: null, wait_timer: null,
   },
-};
+}).map(([name, environment]) => [name, addEnvironmentProtection(environment)]));
 
 const desktopTags = [
   "refs/tags/colony-desktop-preview-v*",
@@ -85,42 +117,60 @@ const desktopTags = [
   "refs/tags/zterm-v*",
 ];
 
+const reviewerBypass = "User:1042757:always";
+const reviewedPullRequestRule =
+  "pull_request:rebase:1:dismiss-stale:optional-code-owner:last-push:resolve-threads";
+const releaseStatusRule =
+  "required_status_checks:strict:on-create:Protected-base release policy:15368";
+const sourceZergLangStatusRule =
+  "required_status_checks:strict:on-create:Protected-base ZergLang release policy:15368";
+const sourceZergChatStatusRule =
+  "required_status_checks:strict:on-create:Protected-base ZergChat release policy:15368";
+
 const releaseRulesets = [
-  { name: "Release branch authority", refs: ["refs/heads/main"],
-    bypass: [reviewer], rules: ["creation", "update"] },
-  { name: "Release branch history", refs: ["refs/heads/main"],
+  { name: "Release branch authority", target: "branch",
+    include: ["refs/heads/main"], exclude: [],
+    bypass: [reviewerBypass], rules: ["creation", "update"] },
+  { name: "Release branch history", target: "branch",
+    include: ["refs/heads/main"], exclude: [],
     bypass: [], rules: ["deletion", "non_fast_forward"] },
-  { name: "Reviewed release requests", refs: ["refs/heads/main"],
-    bypass: [reviewer], rules: [
-      "pull_request:rebase:1:last-push", "required_linear_history",
-      "required_status_checks:Protected-base release policy:15368:strict",
+  { name: "Reviewed release requests", target: "branch",
+    include: ["refs/heads/main"], exclude: [],
+    bypass: [reviewerBypass], rules: [
+      reviewedPullRequestRule, "required_linear_history", releaseStatusRule,
     ] },
-  { name: "ZergChat feed authority", refs: ["refs/heads/release-data"],
-    bypass: ["DeployKey:any"], rules: ["creation", "update"] },
-  { name: "ZergChat feed history", refs: ["refs/heads/release-data"],
+  { name: "ZergChat feed authority", target: "branch",
+    include: ["refs/heads/release-data"], exclude: [],
+    bypass: ["DeployKey:any:always"], rules: ["creation", "update"] },
+  { name: "ZergChat feed history", target: "branch",
+    include: ["refs/heads/release-data"], exclude: [],
     bypass: [], rules: ["deletion", "non_fast_forward"] },
-  { name: "Release tag authority", refs: [
+  { name: "Release tag authority", target: "tag", include: [
     "refs/tags/zergchat-preview-v*", "refs/tags/zergchat-v*",
-  ], bypass: [reviewer], rules: ["creation"] },
-  { name: "Release tag immutability", refs: [
+  ], exclude: [], bypass: [reviewerBypass], rules: ["creation"] },
+  { name: "Release tag immutability", target: "tag", include: [
     "refs/tags/zergchat-preview-v*", "refs/tags/zergchat-v*",
-  ], bypass: [], rules: ["deletion", "update"] },
+  ], exclude: [], bypass: [], rules: ["deletion", "update"] },
 ];
 
 const sourceRulesets = [
-  { name: "Development branch authority", refs: ["refs/heads/development"],
-    bypass: [reviewer], rules: ["creation", "update"] },
-  { name: "Development branch history", refs: ["refs/heads/development"],
+  { name: "Development branch authority", target: "branch",
+    include: ["refs/heads/development"], exclude: [],
+    bypass: [reviewerBypass], rules: ["creation", "update"] },
+  { name: "Development branch history", target: "branch",
+    include: ["refs/heads/development"], exclude: [],
     bypass: [], rules: ["deletion", "non_fast_forward"] },
-  { name: "Reviewed development changes", refs: ["refs/heads/development"],
-    bypass: [reviewer], rules: [
-      "pull_request:rebase:1:last-push", "required_linear_history",
-      "required_status_checks:Protected-base ZergLang release policy:15368:strict",
-      "required_status_checks:Protected-base ZergChat release policy:15368:strict",
+  { name: "Reviewed development changes", target: "branch",
+    include: ["refs/heads/development"], exclude: [],
+    bypass: [reviewerBypass], rules: [
+      reviewedPullRequestRule, "required_linear_history",
+      sourceZergLangStatusRule, sourceZergChatStatusRule,
     ] },
-  { name: "Desktop release tag authority", refs: desktopTags,
-    bypass: [reviewer], rules: ["creation"] },
-  { name: "Desktop release tag immutability", refs: desktopTags,
+  { name: "Desktop release tag authority", target: "tag",
+    include: desktopTags, exclude: [],
+    bypass: [reviewerBypass], rules: ["creation"] },
+  { name: "Desktop release tag immutability", target: "tag",
+    include: desktopTags, exclude: [],
     bypass: [], rules: ["deletion", "update"] },
 ];
 
@@ -155,6 +205,12 @@ function releaseDataEntries() {
 function idealState(releaseState = "disabled_manually") {
   return structuredClone({
     release: {
+      repository: {
+        full_name: "Epoch-ML/zergchat-releases",
+        private: false,
+        archived: false,
+        default_branch: "main",
+      },
       immutableReleases: { enabled: true },
       pages: {
         https_enforced: true,
@@ -174,23 +230,39 @@ function idealState(releaseState = "disabled_manually") {
       ],
       environments,
       repositorySecrets: [],
-      deployKeys: [{ title: "ZergChat release feed writer 2026", read_only: false, verified: true }],
+      deployKeys: [{
+        title: "ZergChat release feed writer 2026",
+        read_only: false,
+        verified: true,
+        fingerprint: feedWriterFingerprint,
+      }],
       rulesets: releaseRulesets,
     },
     source: {
+      repository: {
+        full_name: "Epoch-ML/zerg",
+        private: true,
+        archived: false,
+        default_branch: "development",
+      },
       workflows: [
         { path: ".github/workflows/zergchat-native-release.yml", state: "active" },
         { path: ".github/workflows/zergchat-release-policy-anchor.yml", state: "active" },
       ],
       environments: {
-        "zergchat-release-request": {
+        "zergchat-release-request": addEnvironmentProtection({
           secrets: [],
           refs: ["tag:zergchat-preview-v*", "tag:zergchat-v*"],
           reviewers: [], prevent_self_review: null, wait_timer: null,
-        },
+        }),
       },
       repositorySecrets: [],
-      deployKeys: [{ title: "ZergChat releases source checkout 2026", read_only: true, verified: true }],
+      deployKeys: [{
+        title: "ZergChat releases source checkout 2026",
+        read_only: true,
+        verified: true,
+        fingerprint: sourceReaderFingerprint,
+      }],
       rulesets: sourceRulesets,
     },
   });
@@ -222,7 +294,7 @@ test("immutability, Pages, feed, workflow, key, secret, and rules drift fail clo
   state.release.repositorySecrets.push("UNSCOPED_SIGNER");
   state.release.rulesets.find(({ name }) => name === "Reviewed release requests").rules = [];
   state.source.deployKeys[0].read_only = false;
-  state.source.rulesets.find(({ name }) => name === "Desktop release tag immutability").refs = [];
+  state.source.rulesets.find(({ name }) => name === "Desktop release tag immutability").include = [];
   const codes = auditRepositoryState(state, { phase: "cutover" }).errors.map(({ code }) => code);
   for (const expected of [
     "immutable-releases", "pages-contract", "feed-branch-contract",
@@ -289,6 +361,29 @@ test("every Pages and workflow identity is independently enforced", () => {
   assert.deepEqual(errorCodes(unrelated), ["workflow-state"]);
 });
 
+test("public and private repository identities are exact", () => {
+  for (const [owner, code, mutations] of [
+    ["release", "repository-contract", [
+      ["full_name", "Epoch-ML/other"],
+      ["private", true],
+      ["archived", true],
+      ["default_branch", "development"],
+    ]],
+    ["source", "source-repository-contract", [
+      ["full_name", "Epoch-ML/other"],
+      ["private", false],
+      ["archived", true],
+      ["default_branch", "main"],
+    ]],
+  ]) {
+    for (const [field, value] of mutations) {
+      const state = idealState();
+      state[owner].repository[field] = value;
+      assert.deepEqual(errorCodes(state), [code], `${owner}/${field}`);
+    }
+  }
+});
+
 test("every environment field and required secret is exact", () => {
   for (const name of Object.keys(environments)) {
     for (const mutate of [
@@ -297,6 +392,10 @@ test("every environment field and required secret is exact", () => {
       (environment) => { environment.reviewers = ["Team:42"]; },
       (environment) => { environment.prevent_self_review = true; },
       (environment) => { environment.wait_timer = 5; },
+      (environment) => { environment.protection_rules.push("wait_timer"); },
+      (environment) => {
+        environment.deployment_branch_policy.protected_branches = true;
+      },
     ]) {
       const state = idealState();
       mutate(state.release.environments[name]);
@@ -320,6 +419,10 @@ test("every environment field and required secret is exact", () => {
     (environment) => { environment.reviewers = [reviewer]; },
     (environment) => { environment.prevent_self_review = false; },
     (environment) => { environment.wait_timer = 5; },
+    (environment) => { environment.protection_rules = []; },
+    (environment) => {
+      environment.deployment_branch_policy.custom_branch_policies = false;
+    },
   ]) {
     const state = idealState();
     mutate(state.source.environments["zergchat-release-request"]);
@@ -333,12 +436,12 @@ test("every ruleset identity, reference, bypass, and rule is exact", () => {
       ? "ruleset-contract"
       : "source-ruleset-contract";
     for (const index of idealState()[owner].rulesets.keys()) {
-      for (const field of ["refs", "bypass", "rules"]) {
+      for (const field of ["target", "include", "exclude", "bypass", "rules"]) {
         const state = idealState();
         const value = state[owner].rulesets[index][field];
-        state[owner].rulesets[index][field] = value.length === 0
-          ? ["unexpected"]
-          : [];
+        state[owner].rulesets[index][field] = field === "target"
+          ? (value === "branch" ? "tag" : "branch")
+          : value.length === 0 ? ["unexpected"] : [];
         assert.deepEqual(errorCodes(state), [expectedCode], `${owner}/${index}/${field}`);
       }
       const missing = idealState();
@@ -351,13 +454,17 @@ test("every ruleset identity, reference, bypass, and rule is exact", () => {
     const state = idealState();
     state[owner].rulesets.push({
       name: "Unreviewed policy",
-      refs: ["~ALL"],
-      bypass: [reviewer],
+      target: "branch",
+      include: ["~ALL"],
+      exclude: [],
+      bypass: [reviewerBypass],
       rules: ["update"],
     });
-    assert.deepEqual(errorCodes(state), [
-      owner === "release" ? "ruleset-contract" : "source-ruleset-contract",
-    ], `${owner}/extra`);
+    assert.deepEqual(
+      errorCodes(state).filter((code) => code.endsWith("ruleset-contract")),
+      owner === "release" ? ["ruleset-contract"] : [],
+      `${owner}/extra`,
+    );
 
     const duplicate = idealState();
     duplicate[owner].rulesets.push(structuredClone(duplicate[owner].rulesets[0]));
@@ -408,8 +515,10 @@ test("feed and source deploy-key authority is exact", () => {
     (state) => { state.release.deployKeys[0].verified = false; },
     (state) => { state.release.deployKeys[0].read_only = true; },
     (state) => { state.release.deployKeys[0].title = "unrelated writer"; },
+    (state) => { state.release.deployKeys[0].fingerprint = sourceReaderFingerprint; },
     (state) => { state.release.deployKeys.push({
       title: "second writer", verified: true, read_only: false,
+      fingerprint: feedWriterFingerprint,
     }); },
   ]) {
     const state = idealState();
@@ -419,13 +528,15 @@ test("feed and source deploy-key authority is exact", () => {
   const harmlessReader = idealState();
   harmlessReader.release.deployKeys.push({
     title: "read-only observer", verified: true, read_only: true,
+    fingerprint: sourceReaderFingerprint,
   });
-  assert.equal(errorCodes(harmlessReader).includes("deploy-key"), false);
+  assert.deepEqual(errorCodes(harmlessReader), ["deploy-key"]);
 
   for (const mutate of [
     (key) => { key.verified = false; },
     (key) => { key.read_only = false; },
     (key) => { key.title = "unrelated reader"; },
+    (key) => { key.fingerprint = feedWriterFingerprint; },
   ]) {
     const state = idealState();
     mutate(state.source.deployKeys[0]);
@@ -437,8 +548,18 @@ test("feed and source deploy-key authority is exact", () => {
     title: "ZergChat releases source checkout duplicate",
     read_only: true,
     verified: true,
+    fingerprint: sourceReaderFingerprint,
   });
   assert.deepEqual(errorCodes(duplicateSourceReader), ["source-key"]);
+
+  const unrelatedSourceReader = idealState();
+  unrelatedSourceReader.source.deployKeys.push({
+    title: "ZergLang releases source checkout 2026",
+    read_only: true,
+    verified: true,
+    fingerprint: feedWriterFingerprint,
+  });
+  assert.equal(errorCodes(unrelatedSourceReader).includes("source-key"), false);
 });
 
 test("release-data has one bounded root topology shared with feed publication", () => {
@@ -778,6 +899,12 @@ test("the GitHub boundary allows only an explicitly missing resource", async () 
 
 test("the collector normalizes settings through one injected HTTP boundary", async () => {
   const responses = new Map([
+    ["Epoch-ML/zergchat-releases:", {
+      full_name: "Epoch-ML/zergchat-releases",
+      private: false,
+      archived: false,
+      default_branch: "main",
+    }],
     ["Epoch-ML/zergchat-releases:immutable-releases", { enabled: true }],
     ["Epoch-ML/zergchat-releases:pages", {
       https_enforced: true, build_type: "workflow",
@@ -805,6 +932,10 @@ test("the collector normalizes settings through one injected HTTP boundary", asy
           ] },
         { type: "wait_timer", wait_timer: 15 },
       ],
+      deployment_branch_policy: {
+        protected_branches: false,
+        custom_branch_policies: true,
+      },
     }] }],
     ["Epoch-ML/zergchat-releases:environments/zergchat-feed/secrets", {
       secrets: [{ name: "Z_SECRET" }, { name: "A_SECRET" }],
@@ -816,23 +947,32 @@ test("the collector normalizes settings through one injected HTTP boundary", asy
       secrets: [{ name: "Z_REPOSITORY" }, { name: "A_REPOSITORY" }],
     }],
     ["Epoch-ML/zergchat-releases:keys", [
-      { title: "feed key", verified: true, read_only: false },
+      {
+        title: "feed key",
+        verified: true,
+        read_only: false,
+        key: testDeployPublicKey,
+      },
     ]],
     ["Epoch-ML/zergchat-releases:rulesets", [{ id: 2 }, { id: 1 }]],
     ["Epoch-ML/zergchat-releases:rulesets/1", {
-      name: "Reviewed release requests", enforcement: "active",
-      conditions: { ref_name: { include: ["refs/heads/main"] } },
+      name: "Reviewed release requests", enforcement: "active", target: "branch",
+      conditions: { ref_name: { include: ["refs/heads/main"], exclude: [] } },
       bypass_actors: [
-        { actor_type: "User", actor_id: 1042757 },
-        { actor_type: "DeployKey", actor_id: null },
+        { actor_type: "User", actor_id: 1042757, bypass_mode: "always" },
+        { actor_type: "DeployKey", actor_id: null, bypass_mode: "always" },
       ],
       rules: [
         { type: "pull_request", parameters: {
           allowed_merge_methods: ["rebase"], required_approving_review_count: 1,
+          dismiss_stale_reviews_on_push: true,
+          require_code_owner_review: false,
           require_last_push_approval: true,
+          required_review_thread_resolution: true,
         } },
         { type: "required_status_checks", parameters: {
           strict_required_status_checks_policy: true,
+          do_not_enforce_on_create: false,
           required_status_checks: [{
             context: "Protected-base release policy", integration_id: 15368,
           }],
@@ -841,15 +981,26 @@ test("the collector normalizes settings through one injected HTTP boundary", asy
       ],
     }],
     ["Epoch-ML/zergchat-releases:rulesets/2", {
-      name: "Inactive", enforcement: "evaluate",
-      conditions: { ref_name: { include: ["~ALL"] } },
+      name: "Inactive", enforcement: "evaluate", target: "branch",
+      conditions: { ref_name: { include: ["~ALL"], exclude: [] } },
       bypass_actors: [], rules: [{ type: "deletion" }],
+    }],
+    ["Epoch-ML/zerg:", {
+      full_name: "Epoch-ML/zerg",
+      private: true,
+      archived: false,
+      default_branch: "development",
     }],
     ["Epoch-ML/zerg:actions/workflows", { workflows: [{
       path: ".github/workflows/zergchat-native-release.yml", state: "active",
     }] }],
     ["Epoch-ML/zerg:environments", { environments: [{
       name: "zergchat-release-request",
+      protection_rules: [{ type: "branch_policy" }],
+      deployment_branch_policy: {
+        protected_branches: false,
+        custom_branch_policies: true,
+      },
     }] }],
     ["Epoch-ML/zerg:environments/zergchat-release-request/secrets", {
       secrets: [],
@@ -861,11 +1012,18 @@ test("the collector normalizes settings through one injected HTTP boundary", asy
       ],
     }],
     ["Epoch-ML/zerg:actions/secrets", { secrets: [] }],
-    ["Epoch-ML/zerg:keys", []],
+    ["Epoch-ML/zerg:keys", [{
+      title: "source key",
+      verified: true,
+      read_only: true,
+      key: testDeployPublicKey,
+    }]],
     ["Epoch-ML/zerg:rulesets", [{ id: 3 }]],
     ["Epoch-ML/zerg:rulesets/3", {
-      name: "Development branch history", enforcement: "active",
-      conditions: { ref_name: { include: ["refs/heads/development"] } },
+      name: "Development branch history", enforcement: "active", target: "branch",
+      conditions: {
+        ref_name: { include: ["refs/heads/development"], exclude: [] },
+      },
       bypass_actors: [],
       rules: [{ type: "deletion" }, { type: "non_fast_forward" }],
     }],
@@ -880,6 +1038,18 @@ test("the collector normalizes settings through one injected HTTP boundary", asy
   };
 
   const state = await collectRepositoryState({ request });
+  assert.deepEqual(state.release.repository, {
+    full_name: "Epoch-ML/zergchat-releases",
+    private: false,
+    archived: false,
+    default_branch: "main",
+  });
+  assert.deepEqual(state.source.repository, {
+    full_name: "Epoch-ML/zerg",
+    private: true,
+    archived: false,
+    default_branch: "development",
+  });
   assert.deepEqual(state.release.feedBranch, {
     name: "release-data", sha: "a".repeat(40), tree_sha: "b".repeat(40),
     truncated: false,
@@ -889,15 +1059,25 @@ test("the collector normalizes settings through one injected HTTP boundary", asy
     secrets: ["A_SECRET", "Z_SECRET"], refs: ["branch:main"],
     reviewers: ["Team:42", "User:1042757"],
     prevent_self_review: false, wait_timer: 15,
+    protection_rules: ["branch_policy", "required_reviewers", "wait_timer"],
+    deployment_branch_policy: {
+      protected_branches: false,
+      custom_branch_policies: true,
+    },
   });
   assert.deepEqual(state.release.rulesets, [{
-    name: "Reviewed release requests", refs: ["refs/heads/main"],
-    bypass: ["DeployKey:any", "User:1042757"],
+    name: "Reviewed release requests", target: "branch",
+    include: ["refs/heads/main"], exclude: [],
+    bypass: ["DeployKey:any:always", "User:1042757:always"],
     rules: [
-      "pull_request:rebase:1:last-push",
+      reviewedPullRequestRule,
       "required_linear_history",
-      "required_status_checks:Protected-base release policy:15368:strict",
+      releaseStatusRule,
     ],
+  }]);
+  assert.deepEqual(state.release.deployKeys, [{
+    title: "feed key", verified: true, read_only: false,
+    fingerprint: testDeployFingerprint,
   }]);
   assert.deepEqual(state.release.repositorySecrets, [
     "A_REPOSITORY",
@@ -915,10 +1095,20 @@ test("the collector normalizes settings through one injected HTTP boundary", asy
   assert.deepEqual(state.source.environments["zergchat-release-request"], {
     secrets: [], refs: ["tag:zergchat-preview-v*", "tag:zergchat-v*"],
     reviewers: [], prevent_self_review: null, wait_timer: null,
+    protection_rules: ["branch_policy"],
+    deployment_branch_policy: {
+      protected_branches: false,
+      custom_branch_policies: true,
+    },
   });
   assert.deepEqual(state.source.rulesets, [{
-    name: "Development branch history", refs: ["refs/heads/development"],
+    name: "Development branch history", target: "branch",
+    include: ["refs/heads/development"], exclude: [],
     bypass: [], rules: ["deletion", "non_fast_forward"],
+  }]);
+  assert.deepEqual(state.source.deployKeys, [{
+    title: "source key", verified: true, read_only: true,
+    fingerprint: testDeployFingerprint,
   }]);
   assert.deepEqual(calls, [...responses.keys()]);
   assert.deepEqual(pagination, [
