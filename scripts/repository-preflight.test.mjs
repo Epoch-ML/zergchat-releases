@@ -10,6 +10,7 @@ import {
   auditRepositoryState,
   collectRepositoryState,
   requestGitHub,
+  runRepositoryPreflight,
 } from "./repository-preflight.mjs";
 
 const preflightCli = fileURLToPath(
@@ -814,4 +815,46 @@ test("the preflight CLI rejects trailing arguments before any network access", (
   assert.equal(result.status, 1);
   assert.match(result.stderr, /usage: repository-preflight\.mjs cutover\|live/);
   assert.doesNotMatch(result.stderr, /GH_TOKEN is required/);
+});
+
+test("the public preflight runner emits state and returns an observable status", async () => {
+  for (const [phase, state, expectedStatus, expectedCodes] of [
+    ["cutover", idealState(), 0, []],
+    ["live", idealState("active"), 0, []],
+    ["cutover", (() => {
+      const state = idealState();
+      state.release.immutableReleases.enabled = false;
+      return state;
+    })(), 1, ["immutable-releases"]],
+  ]) {
+    const output = [];
+    const status = await runRepositoryPreflight([phase], {
+      // GitHub collection is the external HTTP boundary.
+      collect: async () => structuredClone(state),
+      // Writing output is the process stdout boundary.
+      write: (value) => output.push(value),
+    });
+    assert.equal(status, expectedStatus, phase);
+    assert.equal(output.length, 1, phase);
+    assert.deepEqual(
+      JSON.parse(output[0]).errors.map(({ code }) => code),
+      expectedCodes,
+      phase,
+    );
+  }
+});
+
+test("the public preflight runner rejects every invalid argument shape", async () => {
+  for (const args of [null, [], ["preview"], ["cutover", "extra"]]) {
+    await assert.rejects(
+      runRepositoryPreflight(args, {
+        // GitHub collection must not run for invalid process arguments.
+        collect: async () => {
+          throw new Error("unexpected collection");
+        },
+      }),
+      (error) => error instanceof RepositoryPreflightError &&
+        error.message === "usage: repository-preflight.mjs cutover|live",
+    );
+  }
 });
