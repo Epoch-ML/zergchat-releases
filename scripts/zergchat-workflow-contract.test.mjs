@@ -118,10 +118,20 @@ describe("ZergChat source-build release contract", () => {
   });
 
   it("signs and publishes the exact universal updater archive", () => {
-    const updater = requireJob("sign-updater");
-    const sign = requireStep(updater, "Sign only the finished updater archive");
-    assert.match(sign.run, /Zergchat_\$\{VERSION\}_universal\.app\.tar\.gz/);
-    const collect = requireStep(updater, "Collect and verify the immutable release payload");
+    const previewSign = requireStep(
+      requireJob("sign-updater-preview"),
+      "Sign only the preview updater archive",
+    );
+    const stableSign = requireStep(
+      requireJob("sign-updater-stable"),
+      "Sign only the stable updater archive",
+    );
+    assert.match(previewSign.run, /Zergchat_\$\{VERSION\}_universal\.app\.tar\.gz/);
+    assert.match(stableSign.run, /Zergchat_\$\{VERSION\}_universal\.app\.tar\.gz/);
+    const collect = requireStep(
+      requireJob("sign-updater"),
+      "Collect and verify the immutable release payload",
+    );
     assert.match(collect.run, /scripts\/collect-release\.mjs/);
     assert.match(collect.run, /darwin-aarch64/);
     assert.match(collect.run, /darwin-x86_64/);
@@ -181,12 +191,17 @@ describe("ZergChat source-build release contract", () => {
       assert.ok(audit.run.includes(token), `signed smoke must execute ${token}`);
     }
 
-    const updater = requireJob("sign-updater");
-    assert.deepEqual(updater.needs, ["validate", "signed-smoke"]);
-    const sign = requireStep(updater, "Sign only the finished updater archive");
-    const signIndex = sign.run.indexOf("tauri signer sign");
-    const unsetIndex = sign.run.indexOf("unset TAURI_SIGNING_PRIVATE_KEY");
-    assert.ok(signIndex >= 0 && unsetIndex > signIndex);
+    for (const [jobName, stepName] of [
+      ["sign-updater-preview", "Sign only the preview updater archive"],
+      ["sign-updater-stable", "Sign only the stable updater archive"],
+    ]) {
+      const updater = requireJob(jobName);
+      assert.deepEqual(updater.needs, ["validate", "signed-smoke"]);
+      const sign = requireStep(updater, stepName);
+      const signIndex = sign.run.indexOf("tauri signer sign");
+      const unsetIndex = sign.run.indexOf("unset TAURI_SIGNING_PRIVATE_KEY");
+      assert.ok(signIndex >= 0 && unsetIndex > signIndex);
+    }
   });
 
   it("isolates preview and stable updater credentials on separate runners", () => {

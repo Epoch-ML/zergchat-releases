@@ -792,14 +792,169 @@ jobs:
           cleanup
           trap - EXIT
 
-  sign-updater:
-    name: Sign finished updater archive in the public trust boundary
+  sign-updater-preview:
+    name: Sign finished preview updater archive
     needs:
       - validate
       - signed-smoke
+    if: needs.validate.outputs.channel == 'preview'
     runs-on: ubuntu-24.04
-    environment:
-      name: ${{ needs.validate.outputs.channel == 'stable' && 'zergchat-stable-updater' || 'zergchat-preview-updater' }}
+    environment: zergchat-preview-updater
+    env:
+      CHANNEL: ${{ needs.validate.outputs.channel }}
+      RELEASE_TAG: ${{ needs.validate.outputs.release_tag }}
+      REQUEST_PATH: ${{ needs.validate.outputs.request_path }}
+      SOURCE_SHA: ${{ needs.validate.outputs.source_sha }}
+      VERSION: ${{ needs.validate.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "22.23.2"
+          cache: npm
+
+      - name: Install only the pinned public updater signer
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: zergchat-v2-macos-platform-signed
+          path: release-input
+
+      - name: Revalidate provenance and the independent updater trust root
+        run: |
+          set -euo pipefail
+          (
+            cd release-input
+            sha256sum -c SHA256SUMS
+          )
+          rm -f release-input/SHA256SUMS
+          node scripts/release-request.mjs "$REQUEST_PATH"
+          public_key="keys/zergchat-preview-updater.pubkey"
+          cmp --silent "$public_key" release-input/updater.pubkey
+          test "$(find release-input -maxdepth 1 -type f -name '*.app.tar.gz' | wc -l)" -eq 1
+          test "$(find release-input -maxdepth 1 -type f -name '*.dmg' | wc -l)" -eq 1
+          test -s release-input/build-metadata.json
+
+      - name: Sign only the preview updater archive
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.ZERGCHAT_PREVIEW_TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.ZERGCHAT_PREVIEW_TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$TAURI_SIGNING_PRIVATE_KEY" || -z "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" ]]; then
+            echo "::error::The environment-scoped preview updater signing identity is incomplete."
+            exit 1
+          fi
+          archive="release-input/Zergchat_${VERSION}_universal.app.tar.gz"
+          test -f "$archive" && test ! -L "$archive"
+          npm exec --offline -- tauri signer sign "$archive"
+          unset TAURI_SIGNING_PRIVATE_KEY TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+          test -s "${archive}.sig"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: zergchat-v2-updater-preview
+          path: release-input/*
+          if-no-files-found: error
+          retention-days: 7
+
+  sign-updater-stable:
+    name: Sign finished stable updater archive
+    needs:
+      - validate
+      - signed-smoke
+    if: needs.validate.outputs.channel == 'stable'
+    runs-on: ubuntu-24.04
+    environment: zergchat-stable-updater
+    env:
+      CHANNEL: ${{ needs.validate.outputs.channel }}
+      REQUEST_PATH: ${{ needs.validate.outputs.request_path }}
+      VERSION: ${{ needs.validate.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "22.23.2"
+          cache: npm
+
+      - name: Install only the pinned public updater signer
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: zergchat-v2-macos-platform-signed
+          path: release-input
+
+      - name: Revalidate provenance and the independent updater trust root
+        run: |
+          set -euo pipefail
+          (
+            cd release-input
+            sha256sum -c SHA256SUMS
+          )
+          rm -f release-input/SHA256SUMS
+          node scripts/release-request.mjs "$REQUEST_PATH"
+          public_key="keys/zergchat-stable-updater.pubkey"
+          cmp --silent "$public_key" release-input/updater.pubkey
+          test "$(find release-input -maxdepth 1 -type f -name '*.app.tar.gz' | wc -l)" -eq 1
+          test "$(find release-input -maxdepth 1 -type f -name '*.dmg' | wc -l)" -eq 1
+          test -s release-input/build-metadata.json
+
+      - name: Sign only the stable updater archive
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.ZERGCHAT_STABLE_TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.ZERGCHAT_STABLE_TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$TAURI_SIGNING_PRIVATE_KEY" || -z "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" ]]; then
+            echo "::error::The environment-scoped stable updater signing identity is incomplete."
+            exit 1
+          fi
+          archive="release-input/Zergchat_${VERSION}_universal.app.tar.gz"
+          test -f "$archive" && test ! -L "$archive"
+          npm exec --offline -- tauri signer sign "$archive"
+          unset TAURI_SIGNING_PRIVATE_KEY TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+          test -s "${archive}.sig"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: zergchat-v2-updater-stable
+          path: release-input/*
+          if-no-files-found: error
+          retention-days: 7
+
+  sign-updater:
+    name: Verify and collect the selected updater payload
+    needs:
+      - validate
+      - sign-updater-preview
+      - sign-updater-stable
+    if: >-
+      always() &&
+      !cancelled() &&
+      needs.validate.result == 'success' &&
+      ((needs.validate.outputs.channel == 'preview' &&
+        needs.sign-updater-preview.result == 'success' &&
+        needs.sign-updater-stable.result == 'skipped') ||
+       (needs.validate.outputs.channel == 'stable' &&
+        needs.sign-updater-stable.result == 'success' &&
+        needs.sign-updater-preview.result == 'skipped'))
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     env:
       CHANNEL: ${{ needs.validate.outputs.channel }}
       RELEASE_TAG: ${{ needs.validate.outputs.release_tag }}
@@ -838,19 +993,21 @@ jobs:
             "$verifier_root/minisign"
           echo "$verifier_root" >>"$GITHUB_PATH"
 
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - if: needs.validate.outputs.channel == 'preview'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: zergchat-v2-macos-platform-signed
+          name: zergchat-v2-updater-preview
           path: release-input
 
-      - name: Revalidate provenance and the independent updater trust root
+      - if: needs.validate.outputs.channel == 'stable'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: zergchat-v2-updater-stable
+          path: release-input
+
+      - name: Revalidate the selected signed payload
         run: |
           set -euo pipefail
-          (
-            cd release-input
-            sha256sum -c SHA256SUMS
-          )
-          rm -f release-input/SHA256SUMS
           node scripts/release-request.mjs "$REQUEST_PATH"
           if [[ "$CHANNEL" == "stable" ]]; then
             public_key="keys/zergchat-stable-updater.pubkey"
@@ -859,25 +1016,9 @@ jobs:
           fi
           cmp --silent "$public_key" release-input/updater.pubkey
           test "$(find release-input -maxdepth 1 -type f -name '*.app.tar.gz' | wc -l)" -eq 1
+          test "$(find release-input -maxdepth 1 -type f -name '*.app.tar.gz.sig' | wc -l)" -eq 1
           test "$(find release-input -maxdepth 1 -type f -name '*.dmg' | wc -l)" -eq 1
           test -s release-input/build-metadata.json
-
-      - name: Sign only the finished updater archive
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ needs.validate.outputs.channel == 'stable' && secrets.ZERGCHAT_STABLE_TAURI_SIGNING_PRIVATE_KEY || secrets.ZERGCHAT_PREVIEW_TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ needs.validate.outputs.channel == 'stable' && secrets.ZERGCHAT_STABLE_TAURI_SIGNING_PRIVATE_KEY_PASSWORD || secrets.ZERGCHAT_PREVIEW_TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ -z "$TAURI_SIGNING_PRIVATE_KEY" || -z "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" ]]; then
-            echo "::error::The environment-scoped $CHANNEL updater signing identity is incomplete."
-            exit 1
-          fi
-          archive="release-input/Zergchat_${VERSION}_universal.app.tar.gz"
-          test -f "$archive" && test ! -L "$archive"
-          npm exec --offline -- tauri signer sign "$archive"
-          unset TAURI_SIGNING_PRIVATE_KEY TAURI_SIGNING_PRIVATE_KEY_PASSWORD
-          test -s "${archive}.sig"
 
       - name: Verify the updater signature with the public trust root
         shell: bash

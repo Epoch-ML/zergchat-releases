@@ -575,9 +575,9 @@ describe("Zergchat release workflow contract", () => {
     const compile = workflow.indexOf(
       "Build the unsigned app without release signing credentials",
     );
-    const signJob = workflow.indexOf("sign-updater:");
+    const signJob = workflow.indexOf("sign-updater-preview:");
     const signingSecrets = workflow.indexOf(
-      "secrets.ZERGCHAT_STABLE_TAURI_SIGNING_PRIVATE_KEY",
+      "secrets.ZERGCHAT_PREVIEW_TAURI_SIGNING_PRIVATE_KEY",
     );
     assert.ok(compile < signJob);
     assert.ok(signJob < signingSecrets);
@@ -591,7 +591,7 @@ describe("Zergchat release workflow contract", () => {
   it("uses fresh source, Apple, and updater hosts with disjoint credentials", () => {
     const buildStart = workflow.indexOf("\n  build-macos:");
     const appleStart = workflow.indexOf("\n  apple-sign:");
-    const updaterStart = workflow.indexOf("\n  sign-updater:");
+    const updaterStart = workflow.indexOf("\n  sign-updater-preview:");
     const publishStart = workflow.indexOf("\n  publish:");
     assert.ok(buildStart > 0 && appleStart > buildStart);
     assert.ok(updaterStart > appleStart && publishStart > updaterStart);
