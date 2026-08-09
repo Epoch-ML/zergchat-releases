@@ -1,0 +1,25 @@
+{
+  "name": "zergchat-releases",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test scripts/*.test.mjs",
+    "test:mutation:asset-url": "stryker run stryker.asset-url.config.mjs",
+    "test:mutation:notes": "stryker run stryker.notes.config.mjs",
+    "test:mutation:pages": "stryker run stryker.pages.config.mjs",
+    "test:mutation:payload": "stryker run stryker.payload.config.mjs",
+    "test:mutation:request": "stryker run stryker.request.config.mjs",
+    "test:mutation:signing": "stryker run stryker.signing.config.mjs"
+  },
+  "dependencies": {
+    "@tauri-apps/cli": "2.10.1",
+    "semver": "7.7.2",
+    "tar": "7.5.22"
+  },
+  "devDependencies": {
+    "@stryker-mutator/core": "9.6.1"
+  },
+  "overrides": {
+    "qs": "6.15.3"
+  }
+}
