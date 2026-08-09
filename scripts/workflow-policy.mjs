@@ -225,88 +225,42 @@ function stepIdentity(step) {
   return "unnamed step";
 }
 
-function firstCommandIndex(run, pattern) {
-  const match = pattern.exec(run);
-  return match === null ? -1 : match.index;
-}
+const CREDENTIAL_PROGRAM_DIAGNOSTICS = Object.freeze({
+  source: Object.freeze({
+    code: "source-credential-window",
+    message: "source credentials may execute only the protected checkout program",
+  }),
+  apple: Object.freeze({
+    code: "apple-secret-window",
+    message: "Apple credentials may execute only the protected signing program",
+  }),
+  updater: Object.freeze({
+    code: "updater-secret-window",
+    message: "updater keys may execute only the protected offline signing program",
+  }),
+  feed: Object.freeze({
+    code: "feed-credential-contract",
+    message: "the feed key may execute only the protected release-data push program",
+  }),
+});
 
-function auditSourceWindow(diagnostics, job, stepName, run) {
-  const unsetIndex = run.indexOf("unset SOURCE_DEPLOY_KEY GITHUB_META_TOKEN");
-  const removeIndex = run.indexOf('rm -f "$key_path"');
-  const materializeIndex = firstCommandIndex(
-    run,
-    /(?:^|\n)(?:GIT_LFS_SKIP_SMUDGE=1\s+)?git\s+-C\s+source\s+(?:checkout|archive)\b|(?:^|\n)(?:npm|cargo|tar)\b/m,
+function auditCredentialProgram(
+  diagnostics,
+  kind,
+  job,
+  stepName,
+  run,
+  expectedRun,
+) {
+  if (run === expectedRun) return;
+  const contract = CREDENTIAL_PROGRAM_DIAGNOSTICS[kind];
+  addDiagnostic(
+    diagnostics,
+    contract.code,
+    job,
+    stepName,
+    contract.message,
   );
-  if (
-    !run.includes("trap 'rm -f \"$key_path\"' EXIT") ||
-    unsetIndex === -1 || removeIndex === -1 ||
-    (materializeIndex !== -1 &&
-      (materializeIndex < unsetIndex || materializeIndex < removeIndex))
-  ) {
-    addDiagnostic(
-      diagnostics,
-      "source-credential-window",
-      job,
-      stepName,
-      "source credentials must be destroyed before source materialization",
-    );
-  }
-}
-
-function auditAppleWindow(diagnostics, job, stepName, run) {
-  if (
-    run.includes("scripts/package-macos.mjs") ||
-    run.includes("scripts/collect-release.mjs") ||
-    /(?:^|\n)\s*(?:node|npm|cargo)\b/m.test(run)
-  ) {
-    addDiagnostic(
-      diagnostics,
-      "apple-secret-window",
-      job,
-      stepName,
-      "Apple credentials may coexist only with signing and notarization tools",
-    );
-  }
-}
-
-function auditUpdaterWindow(diagnostics, job, stepName, run) {
-  const unsetIndex = run.indexOf(
-    "unset TAURI_SIGNING_PRIVATE_KEY TAURI_SIGNING_PRIVATE_KEY_PASSWORD",
-  );
-  const signIndex = run.indexOf("npm exec --offline -- tauri signer sign");
-  const extraWorkIndex = firstCommandIndex(
-    run,
-    /(?:^|\n)\s*(?:curl|wget|tar|sha256sum|minisign)\b|scripts\/(?:collect|verify|release)/m,
-  );
-  if (
-    signIndex === -1 || unsetIndex < signIndex ||
-    (extraWorkIndex !== -1 && extraWorkIndex < unsetIndex)
-  ) {
-    addDiagnostic(
-      diagnostics,
-      "updater-secret-window",
-      job,
-      stepName,
-      "updater keys may coexist only with one offline signing operation",
-    );
-  }
-}
-
-function auditFeedWindow(diagnostics, job, stepName, run) {
-  if (
-    !run.includes("HEAD:refs/heads/release-data") ||
-    run.includes("HEAD:refs/heads/main") ||
-    !run.includes("unset ZERGCHAT_FEED_DEPLOY_KEY") ||
-    !run.includes("trap 'rm -f \"$key_path\"' EXIT")
-  ) {
-    addDiagnostic(
-      diagnostics,
-      "feed-credential-contract",
-      job,
-      stepName,
-      "the feed key may push only the prepared release-data commit",
-    );
-  }
 }
 
 function auditJobShape(diagnostics, jobName, job, expected) {
@@ -490,6 +444,9 @@ export function auditWorkflowPolicy(source) {
     for (const [index, rawStep] of job.steps.entries()) {
       const step = requireMapping(rawStep, `${jobName} step ${index + 1}`);
       const stepName = stepIdentity(step);
+      const expectedStep = expected !== undefined && Array.isArray(expected.steps)
+        ? expected.steps[index]
+        : undefined;
       const envReferences = collectSecretReferences(step.env ?? {});
       const outsideReferences = collectSecretReferencesOutsideStepEnv(step);
       if (
@@ -551,17 +508,20 @@ export function auditWorkflowPolicy(source) {
         envReferences.filter(({ canonical }) => canonical).map(({ name }) => name),
       );
       const run = typeof step.run === "string" ? step.run : "";
-      if (secretNames.has("ZERG_SOURCE_DEPLOY_KEY")) {
-        auditSourceWindow(diagnostics, jobName, stepName, run);
-      }
-      if ([...secretNames].some((name) => name?.startsWith("ZERGCHAT_APPLE_"))) {
-        auditAppleWindow(diagnostics, jobName, stepName, run);
-      }
-      if ([...secretNames].some((name) => name?.includes("TAURI_SIGNING"))) {
-        auditUpdaterWindow(diagnostics, jobName, stepName, run);
-      }
-      if (secretNames.has("ZERGCHAT_FEED_DEPLOY_KEY")) {
-        auditFeedWindow(diagnostics, jobName, stepName, run);
+      const credentialKind = credentialKindForJob(jobName);
+      if (credentialKind !== null && secretNames.size > 0) {
+        const expectedRun = expectedStep !== undefined &&
+            typeof expectedStep.run === "string"
+          ? expectedStep.run
+          : null;
+        auditCredentialProgram(
+          diagnostics,
+          credentialKind,
+          jobName,
+          stepName,
+          run,
+          expectedRun,
+        );
       }
     }
   }
