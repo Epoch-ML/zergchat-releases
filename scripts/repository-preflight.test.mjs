@@ -389,6 +389,22 @@ test("every bounded release-data branch invariant is enforced", () => {
     assert.deepEqual(errorCodes(state), ["feed-branch-contract"]);
   }
 
+  for (const requiredPath of ["site", "site/.nojekyll", "site/index.html"]) {
+    const missing = idealState();
+    missing.release.feedBranch.entries = missing.release.feedBranch.entries
+      .filter(({ path }) => path !== requiredPath);
+    assert.deepEqual(errorCodes(missing), ["feed-branch-contract"], requiredPath);
+  }
+
+  const exactPathLimit = idealState();
+  exactPathLimit.release.feedBranch.entries.push({
+    path: `site/${"x".repeat(507)}`, mode: "100644", type: "blob",
+  });
+  assert.equal(errorCodes(exactPathLimit).includes("feed-branch-contract"), false);
+  exactPathLimit.release.feedBranch.entries.at(-1).path =
+    `site/${"x".repeat(508)}`;
+  assert.deepEqual(errorCodes(exactPathLimit), ["feed-branch-contract"]);
+
   const exactLimit = idealState();
   while (exactLimit.release.feedBranch.entries.length < 4_096) {
     const index = exactLimit.release.feedBranch.entries.length;
