@@ -208,6 +208,8 @@ function idealState(releaseState = "disabled_manually") {
       repository: {
         full_name: "Epoch-ML/zergchat-releases",
         private: false,
+        visibility: "public",
+        disabled: false,
         archived: false,
         default_branch: "main",
       },
@@ -242,6 +244,8 @@ function idealState(releaseState = "disabled_manually") {
       repository: {
         full_name: "Epoch-ML/zerg",
         private: true,
+        visibility: "private",
+        disabled: false,
         archived: false,
         default_branch: "development",
       },
@@ -366,12 +370,16 @@ test("public and private repository identities are exact", () => {
     ["release", "repository-contract", [
       ["full_name", "Epoch-ML/other"],
       ["private", true],
+      ["visibility", "internal"],
+      ["disabled", true],
       ["archived", true],
       ["default_branch", "development"],
     ]],
     ["source", "source-repository-contract", [
       ["full_name", "Epoch-ML/other"],
       ["private", false],
+      ["visibility", "internal"],
+      ["disabled", true],
       ["archived", true],
       ["default_branch", "main"],
     ]],
@@ -902,6 +910,8 @@ test("the collector normalizes settings through one injected HTTP boundary", asy
     ["Epoch-ML/zergchat-releases:", {
       full_name: "Epoch-ML/zergchat-releases",
       private: false,
+      visibility: "public",
+      disabled: false,
       archived: false,
       default_branch: "main",
     }],
@@ -988,6 +998,8 @@ test("the collector normalizes settings through one injected HTTP boundary", asy
     ["Epoch-ML/zerg:", {
       full_name: "Epoch-ML/zerg",
       private: true,
+      visibility: "private",
+      disabled: false,
       archived: false,
       default_branch: "development",
     }],
@@ -1041,12 +1053,16 @@ test("the collector normalizes settings through one injected HTTP boundary", asy
   assert.deepEqual(state.release.repository, {
     full_name: "Epoch-ML/zergchat-releases",
     private: false,
+    visibility: "public",
+    disabled: false,
     archived: false,
     default_branch: "main",
   });
   assert.deepEqual(state.source.repository, {
     full_name: "Epoch-ML/zerg",
     private: true,
+    visibility: "private",
+    disabled: false,
     archived: false,
     default_branch: "development",
   });
@@ -1129,6 +1145,22 @@ test("the collector normalizes settings through one injected HTTP boundary", asy
   ]);
 
   for (const [key, malformed] of [
+    ["Epoch-ML/zergchat-releases:", {
+      ...responses.get("Epoch-ML/zergchat-releases:"),
+      visibility: false,
+    }],
+    ["Epoch-ML/zergchat-releases:", {
+      ...responses.get("Epoch-ML/zergchat-releases:"),
+      disabled: "false",
+    }],
+    ["Epoch-ML/zerg:", {
+      ...responses.get("Epoch-ML/zerg:"),
+      visibility: null,
+    }],
+    ["Epoch-ML/zerg:", {
+      ...responses.get("Epoch-ML/zerg:"),
+      disabled: 0,
+    }],
     ["Epoch-ML/zergchat-releases:actions/secrets", { secrets: "invalid" }],
     ["Epoch-ML/zerg:actions/secrets", { secrets: null }],
     ["Epoch-ML/zergchat-releases:rulesets", { rulesets: [] }],
