@@ -3,11 +3,11 @@ import { pathToFileURL } from "node:url";
 
 export function makeReleaseNotes({ version, channel, sourceSha }) {
   return [
-    `Zergchat ${version} (${channel}, Apple Silicon macOS)`,
+    `Zergchat ${version} (${channel}, universal macOS)`,
     "",
     `Built from Epoch-ML/zerg commit ${sourceSha} after source, dependency, Apple platform-signature, updater-signature, and artifact verification.`,
     "",
-    "Important upgrade notice: Zergchat 0.1.2, 0.2.0, and 0.2.1 desktop installations cannot complete this upgrade in-app. Please download and install this release manually once; automatic in-app updates resume from this release onward.",
+    "Important upgrade notice: existing native Zergchat installations through 0.1.8 cannot reach this public updater feed. Please download and install this release manually once; automatic in-app updates begin with this updater-v2 build.",
     "",
   ].join("\n");
 }
