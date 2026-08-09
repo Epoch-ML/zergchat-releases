@@ -621,6 +621,121 @@ test("the GitHub boundary is authenticated, versioned, and read-only", async () 
   }]);
 });
 
+test("the GitHub boundary collects every authenticated pagination page", async () => {
+  const base = "https://api.github.com/repos/Epoch-ML/zergchat-releases/actions/workflows";
+  const calls = [];
+  const fetchImpl = async (url) => {
+    calls.push(url);
+    if (calls.length === 1) {
+      return {
+        ok: true,
+        status: 200,
+        headers: new Headers({
+          link: `<${base}?page=2&per_page=100>; rel="next", ` +
+            `<${base}?page=2&per_page=100>; rel="last"`,
+        }),
+        json: async () => ({
+          total_count: 2,
+          workflows: [{ id: 1, path: ".github/workflows/release.yml" }],
+        }),
+      };
+    }
+    return {
+      ok: true,
+      status: 200,
+      headers: new Headers(),
+      json: async () => ({
+        total_count: 2,
+        workflows: [{ id: 2, path: ".github/workflows/policy.yml" }],
+      }),
+    };
+  };
+
+  const result = await requestGitHub({
+    repository: "Epoch-ML/zergchat-releases",
+    path: "actions/workflows",
+    paginationKey: "workflows",
+  }, { token: "test-token", fetchImpl });
+
+  assert.deepEqual(result, {
+    total_count: 2,
+    workflows: [
+      { id: 1, path: ".github/workflows/release.yml" },
+      { id: 2, path: ".github/workflows/policy.yml" },
+    ],
+  });
+  assert.deepEqual(calls, [
+    `${base}?per_page=100`,
+    `${base}?page=2&per_page=100`,
+  ]);
+});
+
+test("array pagination and hostile Link metadata fail closed", async () => {
+  const rulesetsUrl = "https://api.github.com/repos/Epoch-ML/zergchat-releases/rulesets";
+  const pages = [
+    {
+      ok: true,
+      status: 200,
+      headers: new Headers({
+        link: `<${rulesetsUrl}?page=2&per_page=100>; rel="next"`,
+      }),
+      json: async () => [{ id: 1 }],
+    },
+    {
+      ok: true,
+      status: 200,
+      headers: new Headers(),
+      json: async () => [{ id: 2 }],
+    },
+  ];
+  assert.deepEqual(await requestGitHub({
+    repository: "Epoch-ML/zergchat-releases",
+    path: "rulesets",
+    paginationKey: "array",
+  }, { token: "test-token", fetchImpl: async () => pages.shift() }), [
+    { id: 1 },
+    { id: 2 },
+  ]);
+
+  for (const [link, message] of [
+    [`<${rulesetsUrl}?page=1&per_page=100>; rel="next"`, /pagination loop/],
+    ["not-a-link", /malformed pagination Link/],
+    ["<https://example.invalid/steal?page=2&per_page=100>; rel=\"next\"", /untrusted pagination URL/],
+  ]) {
+    const fetchImpl = async () => ({
+      ok: true,
+      status: 200,
+      headers: new Headers({ link }),
+      json: async () => [],
+    });
+    await assert.rejects(requestGitHub({
+      repository: "Epoch-ML/zergchat-releases",
+      path: "rulesets",
+      paginationKey: "array",
+    }, { token: "test-token", fetchImpl }), message);
+  }
+
+  await assert.rejects(requestGitHub({
+    repository: "Epoch-ML/zergchat-releases",
+    path: "actions/workflows",
+    paginationKey: "workflows",
+  }, {
+    token: "test-token",
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      headers: new Headers(),
+      json: async () => ({ total_count: 2, workflows: [{ id: 1 }] }),
+    }),
+  }), /pagination total_count does not match 1 records/);
+
+  await assert.rejects(requestGitHub({
+    repository: "Epoch-ML/zergchat-releases",
+    path: "actions/workflows",
+    paginationKey: "unknown",
+  }, { token: "test-token", fetchImpl: async () => null }), /pagination key is invalid/);
+});
+
 test("the GitHub boundary allows only an explicitly missing resource", async () => {
   const notFound = async () => ({
     ok: false, status: 404, json: async () => ({ message: "Not Found" }),
@@ -756,9 +871,11 @@ test("the collector normalizes settings through one injected HTTP boundary", asy
     }],
   ]);
   const calls = [];
-  const request = async ({ repository, path }) => {
+  const pagination = [];
+  const request = async ({ repository, path, paginationKey }) => {
     const key = `${repository}:${path}`;
     calls.push(key);
+    if (paginationKey !== undefined) pagination.push(`${key}:${paginationKey}`);
     return structuredClone(responses.get(key));
   };
 
@@ -804,6 +921,22 @@ test("the collector normalizes settings through one injected HTTP boundary", asy
     bypass: [], rules: ["deletion", "non_fast_forward"],
   }]);
   assert.deepEqual(calls, [...responses.keys()]);
+  assert.deepEqual(pagination, [
+    "Epoch-ML/zergchat-releases:actions/workflows:workflows",
+    "Epoch-ML/zergchat-releases:environments:environments",
+    "Epoch-ML/zergchat-releases:environments/zergchat-feed/secrets:secrets",
+    "Epoch-ML/zergchat-releases:environments/zergchat-feed/deployment-branch-policies:branch_policies",
+    "Epoch-ML/zergchat-releases:actions/secrets:secrets",
+    "Epoch-ML/zergchat-releases:keys:array",
+    "Epoch-ML/zergchat-releases:rulesets:array",
+    "Epoch-ML/zerg:actions/workflows:workflows",
+    "Epoch-ML/zerg:environments:environments",
+    "Epoch-ML/zerg:environments/zergchat-release-request/secrets:secrets",
+    "Epoch-ML/zerg:environments/zergchat-release-request/deployment-branch-policies:branch_policies",
+    "Epoch-ML/zerg:actions/secrets:secrets",
+    "Epoch-ML/zerg:keys:array",
+    "Epoch-ML/zerg:rulesets:array",
+  ]);
 
   for (const [key, malformed] of [
     ["Epoch-ML/zergchat-releases:actions/secrets", { secrets: "invalid" }],
