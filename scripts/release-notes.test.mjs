@@ -21,34 +21,34 @@ describe("Zergchat public release notes", () => {
   it("preserves the verified release description", () => {
     assert.equal(
       makeReleaseNotes({
-        version: "0.2.2",
+        version: "0.1.9",
         channel: "stable",
         sourceSha: "0123456789abcdef0123456789abcdef01234567",
       }),
-      "Zergchat 0.2.2 (stable, Apple Silicon macOS)\n\n" +
+      "Zergchat 0.1.9 (stable, universal macOS)\n\n" +
         "Built from Epoch-ML/zerg commit 0123456789abcdef0123456789abcdef01234567 " +
         "after source, dependency, Apple platform-signature, updater-signature, " +
         "and artifact verification.\n\n" +
-        "Important upgrade notice: Zergchat 0.1.2, 0.2.0, and 0.2.1 desktop " +
-        "installations cannot complete this upgrade in-app. Please download and " +
-        "install this release manually once; automatic in-app updates resume from " +
-        "this release onward.\n",
+        "Important upgrade notice: existing native Zergchat installations through " +
+        "0.1.8 cannot reach this public updater feed. Please download and install " +
+        "this release manually once; automatic in-app updates begin with this " +
+        "updater-v2 build.\n",
     );
   });
 
   it("requires one manual bridge from every pre-fix desktop release", () => {
     const notes = makeReleaseNotes({
-      version: "0.2.2",
+      version: "0.1.9",
       channel: "stable",
       sourceSha: "0123456789abcdef0123456789abcdef01234567",
     });
 
     assert.match(notes, /Important upgrade notice:/u);
-    assert.match(notes, /0\.1\.2/u);
-    assert.match(notes, /0\.2\.0/u);
-    assert.match(notes, /0\.2\.1/u);
+    assert.match(notes, /through 0\.1\.8/u);
+    assert.match(notes, /public updater feed/u);
     assert.match(notes, /download and install this release manually once/u);
-    assert.match(notes, /automatic in-app updates resume/u);
+    assert.match(notes, /automatic in-app updates begin/u);
+    assert.doesNotMatch(notes, /0\.2\.[01]/u);
   });
 
   it("writes one new notes file and refuses to overwrite it", async () => {
@@ -58,7 +58,7 @@ describe("Zergchat public release notes", () => {
     const arguments_ = [
       new URL("./release-notes.mjs", import.meta.url).pathname,
       outputPath,
-      "0.2.2-preview.1",
+      "0.1.9-preview.1",
       "preview",
       "fedcba9876543210fedcba9876543210fedcba98",
     ];
@@ -66,14 +66,14 @@ describe("Zergchat public release notes", () => {
     await execFileAsync(process.execPath, arguments_);
     assert.equal(
       await readFile(outputPath, "utf8"),
-      "Zergchat 0.2.2-preview.1 (preview, Apple Silicon macOS)\n\n" +
+      "Zergchat 0.1.9-preview.1 (preview, universal macOS)\n\n" +
         "Built from Epoch-ML/zerg commit fedcba9876543210fedcba9876543210fedcba98 " +
         "after source, dependency, Apple platform-signature, updater-signature, " +
         "and artifact verification.\n\n" +
-        "Important upgrade notice: Zergchat 0.1.2, 0.2.0, and 0.2.1 desktop " +
-        "installations cannot complete this upgrade in-app. Please download and " +
-        "install this release manually once; automatic in-app updates resume from " +
-        "this release onward.\n",
+        "Important upgrade notice: existing native Zergchat installations through " +
+        "0.1.8 cannot reach this public updater feed. Please download and install " +
+        "this release manually once; automatic in-app updates begin with this " +
+        "updater-v2 build.\n",
     );
     await assert.rejects(
       execFileAsync(process.execPath, arguments_),
