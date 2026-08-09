@@ -393,8 +393,24 @@ test("every bounded release-data branch invariant is enforced", () => {
     const missing = idealState();
     missing.release.feedBranch.entries = missing.release.feedBranch.entries
       .filter(({ path }) => path !== requiredPath);
+    missing.release.feedBranch.entries.push({
+      path: `site/replacement-${missing.release.feedBranch.entries.length}.json`,
+      mode: "100644",
+      type: "blob",
+    });
     assert.deepEqual(errorCodes(missing), ["feed-branch-contract"], requiredPath);
   }
+
+  const nestedDirectory = idealState();
+  nestedDirectory.release.feedBranch.entries.push({
+    path: "site/releases", mode: "040000", type: "tree",
+  });
+  assert.equal(errorCodes(nestedDirectory).includes("feed-branch-contract"), false);
+  nestedDirectory.release.feedBranch.entries.at(-1).mode = "100644";
+  assert.deepEqual(errorCodes(nestedDirectory), ["feed-branch-contract"]);
+  nestedDirectory.release.feedBranch.entries.at(-1).mode = "040000";
+  nestedDirectory.release.feedBranch.entries.at(-1).type = "blob";
+  assert.deepEqual(errorCodes(nestedDirectory), ["feed-branch-contract"]);
 
   const exactPathLimit = idealState();
   exactPathLimit.release.feedBranch.entries.push({
