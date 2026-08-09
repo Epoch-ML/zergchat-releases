@@ -234,6 +234,38 @@ jobs:
         run: |
           rm -f "$RUNNER_TEMP/zergchat-build-source-ssh/deploy-key"
 
+      - name: Bind source media capabilities to the public entitlement contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          public_entitlements="release-repository/macos/Zergchat.entitlements.plist"
+          source_entitlements="source/zapps/zergchat/src-tauri/Entitlements.plist"
+          source_config="source/zapps/zergchat/src-tauri/tauri.conf.json"
+          source_info="source/zapps/zergchat/src-tauri/Info.plist"
+          test -f "$public_entitlements" && test ! -L "$public_entitlements"
+          test -f "$source_entitlements" && test ! -L "$source_entitlements"
+          test -f "$source_config" && test ! -L "$source_config"
+          test -f "$source_info" && test ! -L "$source_info"
+          TAURI_CONFIG="$source_config" node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import { readFile } from "node:fs/promises";
+
+          const config = JSON.parse(
+            await readFile(process.env.TAURI_CONFIG, "utf8"),
+          );
+          assert.equal(config.bundle.macOS.entitlements, "Entitlements.plist");
+          assert.equal(config.bundle.macOS.infoPlist, "Info.plist");
+          NODE
+          for key in \
+            NSMicrophoneUsageDescription \
+            NSCameraUsageDescription \
+            NSScreenCaptureUsageDescription \
+            NSLocalNetworkUsageDescription; do
+            description="$(/usr/libexec/PlistBuddy -c "Print :$key" "$source_info")"
+            test -n "$description"
+          done
+          cmp --silent "$public_entitlements" "$source_entitlements"
+
       - name: Compare both tag-selected updater keys with independent trust roots
         run: |
           set -euo pipefail
@@ -566,7 +598,33 @@ jobs:
             identity="$ZERGCHAT_APPLE_SIGNING_IDENTITY"
           fi
 
-          scripts/sign-macos-app.sh "$app" "$identity" "$CHANNEL" "$VERSION"
+          scripts/sign-macos-app.sh "$app" "$identity" "$CHANNEL" "$VERSION" \
+            macos/Zergchat.entitlements.plist
+
+          signed_entitlements="$RUNNER_TEMP/zergchat-signed-entitlements.plist"
+          signed_entitlements_json="$RUNNER_TEMP/zergchat-signed-entitlements.json"
+          codesign -d --entitlements - --xml "$app" >"$signed_entitlements"
+          test -s "$signed_entitlements"
+          plutil -convert json -o "$signed_entitlements_json" "$signed_entitlements"
+          SIGNED_ENTITLEMENTS_JSON="$signed_entitlements_json" \
+            node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import { readFile } from "node:fs/promises";
+
+          const actual = JSON.parse(
+            await readFile(process.env.SIGNED_ENTITLEMENTS_JSON, "utf8"),
+          );
+          const expected = {
+            "com.apple.security.app-sandbox": false,
+            "com.apple.security.network.client": true,
+            "com.apple.security.network.server": true,
+            "com.apple.security.device.audio-input": true,
+            "com.apple.security.device.camera": true,
+            "com.apple.security.cs.allow-jit": true,
+            "com.apple.security.cs.allow-unsigned-executable-memory": true,
+          };
+          assert.deepEqual(actual, expected);
+          NODE
 
           if [[ "$CHANNEL" == "stable" ]]; then
             app_zip="$RUNNER_TEMP/Zergchat-notarization.zip"
@@ -766,6 +824,30 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "$app"
           codesign --verify --strict --verbose=2 "$dmg"
           hdiutil verify "$dmg" >/dev/null
+          signed_entitlements="$RUNNER_TEMP/zergchat-smoke-entitlements.plist"
+          signed_entitlements_json="$RUNNER_TEMP/zergchat-smoke-entitlements.json"
+          codesign -d --entitlements - --xml "$app" >"$signed_entitlements"
+          test -s "$signed_entitlements"
+          plutil -convert json -o "$signed_entitlements_json" "$signed_entitlements"
+          SIGNED_ENTITLEMENTS_JSON="$signed_entitlements_json" \
+            node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import { readFile } from "node:fs/promises";
+
+          const actual = JSON.parse(
+            await readFile(process.env.SIGNED_ENTITLEMENTS_JSON, "utf8"),
+          );
+          const expected = {
+            "com.apple.security.app-sandbox": false,
+            "com.apple.security.network.client": true,
+            "com.apple.security.network.server": true,
+            "com.apple.security.device.audio-input": true,
+            "com.apple.security.device.camera": true,
+            "com.apple.security.cs.allow-jit": true,
+            "com.apple.security.cs.allow-unsigned-executable-memory": true,
+          };
+          assert.deepEqual(actual, expected);
+          NODE
           if [[ "$CHANNEL" == "stable" ]]; then
             xcrun stapler validate "$app"
             xcrun stapler validate "$dmg"

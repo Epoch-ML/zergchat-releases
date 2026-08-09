@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ "$#" -ne 4 ]]; then
-  echo "usage: $0 APPLICATION.app IDENTITY CHANNEL VERSION" >&2
+if [[ "$#" -ne 5 ]]; then
+  echo "usage: $0 APPLICATION.app IDENTITY CHANNEL VERSION ENTITLEMENTS.plist" >&2
   exit 2
 fi
 
@@ -10,12 +10,22 @@ app="$1"
 identity="$2"
 channel="$3"
 version="$4"
+entitlements="$5"
 plist="$app/Contents/Info.plist"
 
 if [[ ! -d "$app/Contents" || -L "$app" || ! -f "$plist" || -L "$plist" ]]; then
   echo "invalid Zergchat application bundle" >&2
   exit 1
 fi
+if [[ ! -f "$entitlements" || -L "$entitlements" ]]; then
+  echo "invalid macOS entitlement contract" >&2
+  exit 1
+fi
+if [[ "$(wc -c <"$entitlements" | tr -d ' ')" -gt 16384 ]]; then
+  echo "macOS entitlement contract exceeds its byte boundary" >&2
+  exit 1
+fi
+plutil -lint "$entitlements" >/dev/null
 if [[ "$channel" != "preview" && "$channel" != "stable" ]]; then
   echo "channel must be preview or stable" >&2
   exit 1
@@ -73,7 +83,8 @@ done < <(
   find "$app/Contents" -depth -type d \
     \( -name '*.app' -o -name '*.framework' -o -name '*.xpc' \) -print0
 )
-codesign "${sign_args[@]}" "$app"
+outer_sign_args=("${sign_args[@]}" --entitlements "$entitlements")
+codesign "${outer_sign_args[@]}" "$app"
 codesign --verify --deep --strict --verbose=2 "$app"
 
 if [[ "$channel" == "stable" ]]; then

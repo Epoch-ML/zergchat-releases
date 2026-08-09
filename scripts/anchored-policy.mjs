@@ -47,6 +47,7 @@ function isProtectedPolicyPath(path) {
     path === "package-lock.json" ||
     path.startsWith("scripts/") ||
     path.startsWith("keys/") ||
+    path.startsWith("macos/") ||
     path.startsWith(".github/");
 }
 
