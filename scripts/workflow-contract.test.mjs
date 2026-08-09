@@ -226,7 +226,7 @@ describe("Zergchat release workflow contract", () => {
     assert.match(workflow, /gh release create/);
     assert.match(workflow, /curl --fail --location/);
     assert.match(workflow, /cmp --silent/);
-    assert.match(workflow, /ref: release-data/);
+    assert.match(workflow, /--branch release-data/);
     assert.match(workflow, /node release-repository\/scripts\/feed-policy\.mjs/);
     assert.match(workflow, /latest-stable\.json/);
     assert.match(workflow, /latest-canary\.json/);
@@ -336,7 +336,7 @@ describe("Zergchat release workflow contract", () => {
     const publicDownload = workflow.indexOf(
       "Download and verify canonical public release assets",
     );
-    const feed = workflow.indexOf("Stage only the channel-scoped v2 Pages feed");
+    const feed = workflow.indexOf("Stage and commit only the channel-scoped v2 Pages feed");
     assert.ok(create < upload);
     assert.ok(upload < complete);
     assert.ok(complete < publish);
@@ -678,15 +678,16 @@ describe("Zergchat release workflow contract", () => {
     assert.match(publishJob, /permissions:\n      contents: write/);
     assert.doesNotMatch(
       publishJob,
-      /ZERGCHAT_FEED_DEPLOY_KEY|name: zergchat-feed|ref: release-data|git push/,
+      /ZERGCHAT_FEED_DEPLOY_KEY|name: zergchat-feed|--branch release-data|git push/,
     );
     assert.match(feedJob, /needs:[\s\S]*- publish/);
     assert.match(feedJob, /permissions:\n      contents: read/);
     assert.match(feedJob, /name: zergchat-feed/);
     assert.match(
       feedJob,
-      /ssh-key: \$\{\{ secrets\.ZERGCHAT_FEED_DEPLOY_KEY \}\}/,
+      /ZERGCHAT_FEED_DEPLOY_KEY: \$\{\{ secrets\.ZERGCHAT_FEED_DEPLOY_KEY \}\}/,
     );
+    assert.doesNotMatch(feedJob, /ssh-key:/);
     assert.match(feedJob, /actions\/download-artifact@/);
     assert.match(
       feedJob,

@@ -188,4 +188,46 @@ describe("ZergChat source-build release contract", () => {
     const unsetIndex = sign.run.indexOf("unset TAURI_SIGNING_PRIVATE_KEY");
     assert.ok(signIndex >= 0 && unsetIndex > signIndex);
   });
+
+  it("destroys the source deploy key before materializing source bytes", () => {
+    const build = requireJob("build-macos");
+    const checkout = requireStep(build, "Check out the exact SHA and matching source tag");
+    const lastFetch = checkout.run.lastIndexOf("git -C source fetch");
+    const unset = checkout.run.indexOf("unset SOURCE_DEPLOY_KEY");
+    const remove = checkout.run.lastIndexOf('rm -f "$key_path"');
+    const materialize = checkout.run.indexOf("git -C source checkout --detach");
+    assert.ok(
+      lastFetch >= 0 && unset > lastFetch && remove > lastFetch && materialize > unset &&
+        materialize > remove,
+      "the source credential must be destroyed after fetch and before checkout",
+    );
+    assert.match(checkout.run, /trap 'rm -f "\$key_path"' EXIT/);
+  });
+
+  it("executes feed policy before a single bounded deploy-key push step", () => {
+    const feed = requireJob("promote-feed");
+    const secretSteps = feed.steps.filter((step) => JSON.stringify(step).includes("secrets."));
+    assert.deepEqual(
+      secretSteps.map((step) => step.name),
+      ["Push the prepared release-data commit"],
+    );
+
+    const stage = requireStep(feed, "Stage and commit only the channel-scoped v2 Pages feed");
+    assert.doesNotMatch(JSON.stringify(stage), /secrets\.|ssh-key/);
+    assert.match(stage.run, /https:\/\/github\.com\/\$GITHUB_REPOSITORY\.git/);
+    assert.match(stage.run, /feed-policy\.mjs/);
+    assert.match(stage.run, /core\.hooksPath/);
+
+    const push = requireStep(feed, "Push the prepared release-data commit");
+    assert.deepEqual(Object.keys(push.env), ["ZERGCHAT_FEED_DEPLOY_KEY"]);
+    assert.match(push.run, /git -C "\$data_repo" push/);
+    assert.match(push.run, /refs\/heads\/release-data/);
+    assert.match(push.run, /unset ZERGCHAT_FEED_DEPLOY_KEY/);
+    assert.doesNotMatch(push.run, /node |npm |feed-policy|git commit|git add/);
+
+    for (const step of feed.steps.filter((step) => step.uses?.startsWith("actions/checkout@"))) {
+      assert.equal(step.with?.["persist-credentials"], false);
+      assert.equal(step.with?.["ssh-key"], undefined);
+    }
+  });
 });
