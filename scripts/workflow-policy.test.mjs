@@ -255,6 +255,19 @@ test("job-level canonical and non-canonical secret contexts are rejected", () =>
   }
 });
 
+test("workflow-level canonical and non-canonical secret contexts are rejected", () => {
+  for (const [value, expectedCode] of [
+    ["${{ secrets.ZERGCHAT_FEED_DEPLOY_KEY }}", "secret-outside-step-env"],
+    ["${{ secrets['ZERGCHAT_FEED_DEPLOY_KEY'] }}",
+      "secret-expression-boundary"],
+  ]) {
+    const hostile = mutateWorkflow((workflow) => {
+      workflow.env = { NESTED: [{ KEY: value }] };
+    });
+    assert.ok(diagnosticCodes(hostile).includes(expectedCode), value);
+  }
+});
+
 test("non-canonical source, Apple, updater, and feed access reports its boundary", () => {
   for (const [jobName, secretName, expectedCode] of [
     ["build-macos", "ZERG_SOURCE_DEPLOY_KEY", "source-credential-contract"],
@@ -346,6 +359,59 @@ test("every approved secret is individually required at its exact env name", () 
   }
 });
 
+test("credential job, step, expression, and uniqueness are independent", () => {
+  const name = "ZERGCHAT_APPLE_API_KEY_ID";
+  const expectedCode = "apple-credential-contract";
+  const canonical = parse(canonicalSource);
+  const location = findSecretLocations(canonical).find(
+    (candidate) => candidate.name === name,
+  );
+  assert.notEqual(location, undefined);
+
+  const mutations = [
+    (workflow, current) => {
+      const value = current.step.env[current.envName];
+      delete current.step.env[current.envName];
+      const target = workflow.jobs[current.jobName].steps.find(
+        (step) => step !== current.step && typeof step.run === "string",
+      );
+      target.env = { ...(target.env ?? {}), [current.envName]: value };
+    },
+    (workflow, current) => {
+      const value = current.step.env[current.envName];
+      delete current.step.env[current.envName];
+      const target = workflow.jobs.validate.steps.find(
+        ({ run }) => typeof run === "string",
+      );
+      target.name = current.step.name;
+      target.env = { ...(target.env ?? {}), [current.envName]: value };
+    },
+    (_workflow, current) => {
+      current.step.env[current.envName] = `\${{secrets.${name}}}`;
+    },
+    (workflow, current) => {
+      const target = workflow.jobs[current.jobName].steps.find(
+        (step) => step !== current.step && typeof step.run === "string",
+      );
+      target.env = {
+        ...(target.env ?? {}),
+        [current.envName]: current.step.env[current.envName],
+      };
+    },
+  ];
+
+  for (const mutate of mutations) {
+    const hostile = mutateWorkflow((workflow) => {
+      const current = findSecretLocations(workflow).find(
+        (candidate) => candidate.name === name,
+      );
+      assert.notEqual(current, undefined);
+      mutate(workflow, current);
+    });
+    assert.ok(diagnosticCodes(hostile).includes(expectedCode));
+  }
+});
+
 test("an unknown canonical secret is rejected by the global allowlist", () => {
   const hostile = mutateWorkflow((workflow) => {
     workflow.jobs.validate.steps[0].env = {
@@ -429,6 +495,14 @@ test("actions, runners, environments, and dependency edges are exact", () => {
   assert.ok(codes.includes("job-contract"));
   assert.ok(codes.includes("environment-boundary"));
   assert.ok(codes.includes("action-contract"));
+});
+
+test("dependency sets accept equivalent scalar and reordered YAML shapes", () => {
+  const equivalent = mutateWorkflow((workflow) => {
+    workflow.jobs["build-macos"].needs = "validate";
+    workflow.jobs["apple-sign"].needs = ["build-macos", "validate"];
+  });
+  assert.deepEqual(auditWorkflowPolicy(equivalent), []);
 });
 
 test("every job preserves its exact runner, permissions, environment, and program", () => {
