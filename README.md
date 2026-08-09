@@ -20,14 +20,18 @@ artifacts, independent channel updater public keys, and GitHub Pages feeds.
    matching source tag and compares both channel updater keys byte for byte
    with the independent roots under [keys](keys/).
 3. Source tests and audits run before any signing credentials are exposed. The
-   macOS app is compiled with no updater or Apple secrets and packaged as a
-   bounded, link-free source stage.
+   source Tauri configuration and huddle usage descriptions are checked, and
+   its macOS entitlement file must match the canonical public file under
+   [macos](macos/) byte for byte. The app is compiled with no updater or Apple
+   secrets and packaged as a bounded, link-free source stage.
 4. A fresh macOS job checks out only this public repository, validates and
    extracts the source archive with path, type, entry-count, compressed-size,
    and uncompressed-size limits, and never executes its payload. Preview apps
    are ad-hoc signed. Stable apps receive Developer ID signing, notarization,
-   and stapling only after hostile-input validation; temporary credentials are
-   deleted even after failure.
+   and stapling only after hostile-input validation. Only the outer application
+   signature receives the canonical huddle/media entitlements, and both the
+   signing job and fresh signed-app smoke verify their exact semantic contents.
+   Temporary credentials are deleted even after failure.
 5. A separate Ubuntu job checks out only this public repository, downloads the
    finished app archive, and exposes the updater private key to a single Tauri
    signer command. Private source and the updater key never coexist.
@@ -38,15 +42,39 @@ artifacts, independent channel updater public keys, and GitHub Pages feeds.
 7. After public release bytes compare exactly, a fresh read-only job enters the
    **zergchat-feed** environment. It revalidates the immutable request, tag, and
    signed feed inputs before committing only the channel feed to
-   **release-data**. The official Pages deployment action publishes that exact
-   tree, then the workflow compares the live HTTPS manifest. The feed is
-   published last and cannot move to an older semantic version.
+   **release-data**. A deterministic generic artifact is uploaded, and a custom
+   OIDC deployment client calls the GitHub Pages Deployments API without an
+   action that reconfigures the site or cancels a recoverable queue. The
+   workflow then compares the live HTTPS manifest. The feed is published last
+   and cannot move to an older semantic version.
 
-Updater feeds:
+Canonical updater endpoints (a channel exists only after its first promotion):
 
 - Stable: https://epoch-ml.github.io/zergchat-releases/stable/latest.json
 - Preview: https://epoch-ml.github.io/zergchat-releases/preview/latest.json
 - Immutable metadata: CHANNEL/releases/VERSION.json
+
+### Pages branch topology
+
+Before the first release, cutover may contain only the root `.nojekyll` and `index.html` files.
+Each `preview` or `stable` subtree is optional; if present, must contain `latest.json` plus at least one matching `releases/VERSION.json`, with the channel and immutable-version naming rules enforced together.
+Live preflight requires at least one complete channel subtree, while each
+promotion separately proves and advances only its selected channel. A
+preview-first launch therefore does not require fake stable feed bytes.
+
+The preflight accepts only the exact root topology: normal `100644` blobs and
+`040000` trees, paths of at most 512 characters, at most 4,096 entries, at most
+1 MiB per file, and at most 64 MiB in aggregate. `.nojekyll` must be empty;
+every other tracked blob must be non-empty. Copies under `site/`, legacy root
+feed names, links, special entries, partial channel groups, and unrelated files
+fail closed.
+
+The custom OIDC deployment client calls the GitHub Pages Deployments API with
+the exact generic artifact ID and workflow run commit. It does not cancel a queued deployment
+when the local 30-minute wait expires, so an idempotent retry can observe the
+same deployment; terminal failure and permission states fail immediately. The
+final gate downloads the promoted release payload separately and compares the
+selected live `latest.json` bytes over HTTPS.
 
 Legacy native releases through 0.1.8 were published from the private source
 repository. Their macOS update facade currently withholds the artifacts, their
@@ -117,7 +145,9 @@ require a human reviewer. Keep these controls enabled:
 - Immutable Releases is enabled.
 - Main requires a pull request; only the owning human may bypass that rule.
 - Main and release-data reject force pushes and deletion.
-- GitHub Pages deploys through the pinned official Pages actions.
+- GitHub Pages receives one deterministic `github-pages` generic artifact and
+  deploys it through the bounded custom OIDC client; no configuration or
+  deployment action can mutate or cancel the flow implicitly.
 
 The public release request commit is itself immutable: its entire change is one
 added request file. Manual retries resolve that original addition commit,

@@ -12,6 +12,7 @@ const REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const TERMINAL_FAILURES = new Map([
   ["deployment_failed", "deployment failed"],
   ["deployment_content_failed", "deployment content failed validation"],
+  ["deployment_perms_error", "deployment permission check failed"],
   ["deployment_cancelled", "deployment was cancelled"],
   ["deployment_lost", "deployment stopped reporting status"],
 ]);

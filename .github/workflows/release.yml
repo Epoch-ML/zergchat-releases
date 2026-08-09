@@ -1828,8 +1828,6 @@ jobs:
           unset ZERGCHAT_FEED_DEPLOY_KEY
           rm -f "$key_path"
 
-      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
-
       - name: Build the deterministic Pages artifact
         shell: bash
         run: |
