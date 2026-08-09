@@ -6,6 +6,8 @@ import fc from "fast-check";
 import {
   RepositoryPreflightError,
   auditRepositoryState,
+  collectRepositoryState,
+  requestGitHub,
 } from "./repository-preflight.mjs";
 
 const reviewer = "User:1042757";
@@ -390,5 +392,222 @@ test("invalid phases and repository documents throw exact public errors", () => 
     () => auditRepositoryState(null, { phase: "cutover" }),
     (error) => error instanceof RepositoryPreflightError &&
       error.message === "repository state must be an object",
+  );
+});
+
+test("the GitHub boundary is authenticated, versioned, and read-only", async () => {
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ enabled: true }),
+    };
+  };
+  const result = await requestGitHub(
+    {
+      repository: "Epoch-ML/zergchat-releases",
+      path: "immutable-releases",
+      apiVersion: "2026-03-10",
+    },
+    { token: "test-token", fetchImpl },
+  );
+  assert.deepEqual(result, { enabled: true });
+  assert.deepEqual(calls, [{
+    url: "https://api.github.com/repos/Epoch-ML/zergchat-releases/immutable-releases",
+    options: { headers: {
+      Accept: "application/vnd.github+json",
+      Authorization: "Bearer test-token",
+      "X-GitHub-Api-Version": "2026-03-10",
+    } },
+  }]);
+});
+
+test("the GitHub boundary allows only an explicitly missing resource", async () => {
+  const notFound = async () => ({
+    ok: false, status: 404, json: async () => ({ message: "Not Found" }),
+  });
+  assert.equal(await requestGitHub({
+    repository: "Epoch-ML/zergchat-releases",
+    path: "branches/release-data",
+    allowNotFound: true,
+  }, { token: "test-token", fetchImpl: notFound }), null);
+  await assert.rejects(
+    requestGitHub({
+      repository: "Epoch-ML/zergchat-releases", path: "rulesets",
+    }, { token: "test-token", fetchImpl: notFound }),
+    /GitHub API Epoch-ML\/zergchat-releases\/rulesets returned 404/,
+  );
+  await assert.rejects(
+    requestGitHub({
+      repository: "Epoch-ML/zergchat-releases", path: "rulesets",
+    }, { token: "", fetchImpl: notFound }),
+    /GH_TOKEN is required for repository preflight/,
+  );
+  await assert.rejects(
+    requestGitHub({
+      repository: "Epoch-ML/zergchat-releases", path: "rulesets",
+    }, { token: "test-token", fetchImpl: null }),
+    /fetchImpl must be a function/,
+  );
+  const serverFailure = async () => ({
+    ok: false, status: 500, json: async () => ({ message: "failure" }),
+  });
+  await assert.rejects(
+    requestGitHub({
+      repository: "Epoch-ML/zergchat-releases",
+      path: "branches/release-data",
+      allowNotFound: true,
+    }, { token: "test-token", fetchImpl: serverFailure }),
+    /returned 500/,
+  );
+});
+
+test("the collector normalizes settings through one injected HTTP boundary", async () => {
+  const responses = new Map([
+    ["Epoch-ML/zergchat-releases:immutable-releases", { enabled: true }],
+    ["Epoch-ML/zergchat-releases:pages", {
+      https_enforced: true, build_type: "workflow",
+      html_url: "https://epoch-ml.github.io/zergchat-releases/", public: true,
+    }],
+    ["Epoch-ML/zergchat-releases:branches/release-data", {
+      name: "release-data",
+      commit: { sha: "a".repeat(40), commit: { tree: { sha: "b".repeat(40) } } },
+    }],
+    [`Epoch-ML/zergchat-releases:git/trees/${"b".repeat(40)}?recursive=1`, {
+      truncated: false,
+      tree: [
+        { path: "site/index.html", mode: "100644", type: "blob" },
+        { path: "site", mode: "040000", type: "tree" },
+        { path: "site/.nojekyll", mode: "100644", type: "blob" },
+      ],
+    }],
+    ["Epoch-ML/zergchat-releases:actions/workflows", { workflows: [{
+      path: ".github/workflows/release.yml", state: "disabled_manually",
+    }] }],
+    ["Epoch-ML/zergchat-releases:environments", { environments: [{
+      name: "zergchat-feed",
+      protection_rules: [
+        { type: "branch_policy" },
+        { type: "required_reviewers", prevent_self_review: false,
+          reviewers: [
+            { type: "User", reviewer: { id: 1042757 } },
+            { type: "Team", reviewer: { id: 42 } },
+          ] },
+        { type: "wait_timer", wait_timer: 15 },
+      ],
+    }] }],
+    ["Epoch-ML/zergchat-releases:environments/zergchat-feed/secrets", {
+      secrets: [{ name: "Z_SECRET" }, { name: "A_SECRET" }],
+    }],
+    ["Epoch-ML/zergchat-releases:environments/zergchat-feed/deployment-branch-policies", {
+      branch_policies: [{ name: "main", type: "branch" }],
+    }],
+    ["Epoch-ML/zergchat-releases:actions/secrets", {
+      secrets: [{ name: "Z_REPOSITORY" }, { name: "A_REPOSITORY" }],
+    }],
+    ["Epoch-ML/zergchat-releases:keys", [
+      { title: "feed key", verified: true, read_only: false },
+    ]],
+    ["Epoch-ML/zergchat-releases:rulesets", [{ id: 2 }, { id: 1 }]],
+    ["Epoch-ML/zergchat-releases:rulesets/1", {
+      name: "Reviewed release requests", enforcement: "active",
+      conditions: { ref_name: { include: ["refs/heads/main"] } },
+      bypass_actors: [
+        { actor_type: "User", actor_id: 1042757 },
+        { actor_type: "DeployKey", actor_id: null },
+      ],
+      rules: [
+        { type: "pull_request", parameters: {
+          allowed_merge_methods: ["rebase"], required_approving_review_count: 1,
+          require_last_push_approval: true,
+        } },
+        { type: "required_status_checks", parameters: {
+          strict_required_status_checks_policy: true,
+          required_status_checks: [{
+            context: "Protected-base release policy", integration_id: 15368,
+          }],
+        } },
+        { type: "required_linear_history" },
+      ],
+    }],
+    ["Epoch-ML/zergchat-releases:rulesets/2", {
+      name: "Inactive", enforcement: "evaluate",
+      conditions: { ref_name: { include: ["~ALL"] } },
+      bypass_actors: [], rules: [{ type: "deletion" }],
+    }],
+    ["Epoch-ML/zerg:actions/workflows", { workflows: [{
+      path: ".github/workflows/zergchat-native-release.yml", state: "active",
+    }] }],
+    ["Epoch-ML/zerg:environments", { environments: [{
+      name: "zergchat-release-request",
+    }] }],
+    ["Epoch-ML/zerg:environments/zergchat-release-request/secrets", {
+      secrets: [],
+    }],
+    ["Epoch-ML/zerg:environments/zergchat-release-request/deployment-branch-policies", {
+      branch_policies: [
+        { name: "zergchat-preview-v*", type: "tag" },
+        { name: "zergchat-v*", type: "tag" },
+      ],
+    }],
+    ["Epoch-ML/zerg:actions/secrets", { secrets: [] }],
+    ["Epoch-ML/zerg:keys", []],
+    ["Epoch-ML/zerg:rulesets", [{ id: 3 }]],
+    ["Epoch-ML/zerg:rulesets/3", {
+      name: "Development branch history", enforcement: "active",
+      conditions: { ref_name: { include: ["refs/heads/development"] } },
+      bypass_actors: [],
+      rules: [{ type: "deletion" }, { type: "non_fast_forward" }],
+    }],
+  ]);
+  const calls = [];
+  const request = async ({ repository, path }) => {
+    const key = `${repository}:${path}`;
+    calls.push(key);
+    return structuredClone(responses.get(key));
+  };
+
+  const state = await collectRepositoryState({ request });
+  assert.deepEqual(state.release.feedBranch, {
+    name: "release-data", sha: "a".repeat(40), tree_sha: "b".repeat(40),
+    truncated: false,
+    entries: [
+      { path: "site", mode: "040000", type: "tree" },
+      { path: "site/.nojekyll", mode: "100644", type: "blob" },
+      { path: "site/index.html", mode: "100644", type: "blob" },
+    ],
+  });
+  assert.deepEqual(state.release.environments["zergchat-feed"], {
+    secrets: ["A_SECRET", "Z_SECRET"], refs: ["branch:main"],
+    reviewers: ["Team:42", "User:1042757"],
+    prevent_self_review: false, wait_timer: 15,
+  });
+  assert.deepEqual(state.release.rulesets, [{
+    name: "Reviewed release requests", refs: ["refs/heads/main"],
+    bypass: ["DeployKey:any", "User:1042757"],
+    rules: [
+      "pull_request:rebase:1:last-push",
+      "required_linear_history",
+      "required_status_checks:Protected-base release policy:15368:strict",
+    ],
+  }]);
+  assert.deepEqual(state.source.environments["zergchat-release-request"], {
+    secrets: [], refs: ["tag:zergchat-preview-v*", "tag:zergchat-v*"],
+    reviewers: [], prevent_self_review: null, wait_timer: null,
+  });
+  assert.deepEqual(state.source.rulesets, [{
+    name: "Development branch history", refs: ["refs/heads/development"],
+    bypass: [], rules: ["deletion", "non_fast_forward"],
+  }]);
+  assert.deepEqual(calls, [...responses.keys()]);
+});
+
+test("the collector rejects a non-callable request boundary", async () => {
+  await assert.rejects(
+    collectRepositoryState({ request: null }),
+    (error) => error instanceof RepositoryPreflightError &&
+      error.message === "request must be a function",
   );
 });
