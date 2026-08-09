@@ -105,10 +105,12 @@ The private source repository has no desktop-release environment, public
 repository deploy key, or repository-wide release secret. Its tag workflow
 only uploads the deterministic request artifact for human review.
 
-The stable Apple and updater environments require a human reviewer. Keep these controls enabled:
+Both channel build and updater environments, plus the stable Apple environment,
+require a human reviewer. Keep these controls enabled:
 
 - Actions may write release contents only from the trusted workflow.
-- Stable build and updater environments have required reviewers.
+- Preview and stable build/updater environments, and stable Apple signing, have
+  required reviewers. The secret-free preview Apple environment does not.
 - Release and source tags cannot be updated or deleted.
 - Only the owning humans may create **zergchat-v\*** and **zergchat-preview-v\*** public
   tags; Actions and deploy keys cannot bypass those tag rules.
