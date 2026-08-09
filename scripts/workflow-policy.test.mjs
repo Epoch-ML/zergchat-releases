@@ -256,6 +256,32 @@ test("source, Apple, updater, and feed credentials stay inside bounded windows",
   assert.ok(codes.includes("feed-credential-contract"));
 });
 
+test("every credential window rejects arbitrary program drift", () => {
+  for (const [jobName, stepName, expectedCode] of [
+    ["build-macos", "Check out the exact SHA and matching source tag",
+      "source-credential-window"],
+    ["apple-sign", "Apply preview ad-hoc or fail-closed stable Apple signing",
+      "apple-secret-window"],
+    ["sign-updater-preview", "Sign only the preview updater archive",
+      "updater-secret-window"],
+    ["sign-updater-stable", "Sign only the stable updater archive",
+      "updater-secret-window"],
+    ["promote-feed", "Push the prepared release-data commit",
+      "feed-credential-contract"],
+  ]) {
+    const hostile = mutateWorkflow((workflow) => {
+      const step = workflow.jobs[jobName].steps.find(
+        ({ name }) => name === stepName,
+      );
+      step.run += "\npython3 -c 'print(\"credential window escape\")'";
+    });
+    assert.ok(
+      diagnosticCodes(hostile).includes(expectedCode),
+      `${jobName}/${stepName}`,
+    );
+  }
+});
+
 test("actions, runners, environments, and dependency edges are exact", () => {
   const drifted = mutateWorkflow((workflow) => {
     workflow.jobs["signed-smoke"]["runs-on"] = "ubuntu-latest";
