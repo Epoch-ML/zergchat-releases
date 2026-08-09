@@ -692,6 +692,16 @@ test("the collector normalizes settings through one injected HTTP boundary", asy
         name: "zergchat-release-request", protection_rules: "invalid",
       }],
     }],
+    ["Epoch-ML/zerg:environments", {
+      environments: [{
+        name: "zergchat-release-request",
+        protection_rules: [{
+          type: "required_reviewers",
+          prevent_self_review: false,
+          reviewers: [{ type: "User", reviewer: { id: "not-an-integer" } }],
+        }],
+      }],
+    }],
     ["Epoch-ML/zergchat-releases:environments/zergchat-feed/secrets", {
       secrets: null,
     }],
