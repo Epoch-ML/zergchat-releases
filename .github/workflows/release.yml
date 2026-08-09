@@ -616,7 +616,36 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "$app"
           codesign --verify --strict --verbose=2 "$dmg"
 
+      - name: Delete ephemeral Apple credentials
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          keychain_path="$RUNNER_TEMP/zergchat-release.keychain-db"
+          original_keychain_path="$RUNNER_TEMP/zergchat-original-default-keychain"
+          if [[ -s "$original_keychain_path" ]]; then
+            original_keychain="$(cat "$original_keychain_path")"
+            security list-keychains -d user -s "$original_keychain"
+            security default-keychain -d user -s "$original_keychain"
+          fi
+          if [[ -f "$keychain_path" ]]; then
+            security delete-keychain "$keychain_path"
+          fi
+          rm -f \
+            "$RUNNER_TEMP/zergchat-developer-id.p12" \
+            "$RUNNER_TEMP"/AuthKey_*.p8 \
+            "$RUNNER_TEMP/zergchat-original-default-keychain"
+
+      - name: Package the credential-free signed payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="$RUNNER_TEMP/zergchat-apple-input/Zergchat.app"
+          output="$RUNNER_TEMP/zergchat-apple-output"
           archive="$output/Zergchat_${VERSION}_universal.app.tar.gz"
+          dmg="$output/Zergchat_${VERSION}_universal.dmg"
+          test -d "$app" && test ! -L "$app"
+          test -f "$dmg" && test ! -L "$dmg"
           node scripts/package-macos.mjs "$app" "$archive"
           if [[ "$CHANNEL" == "stable" ]]; then
             cp keys/zergchat-stable-updater.pubkey "$output/updater.pubkey"
@@ -643,6 +672,15 @@ jobs:
             JSON.stringify(metadata, null, 2) + "\n",
           );
           NODE
+          (
+            cd "$output"
+            shasum -a 256 \
+              "$(basename "$archive")" \
+              "$(basename "$dmg")" \
+              build-metadata.json \
+              updater.pubkey \
+              >SHA256SUMS
+          )
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -652,31 +690,110 @@ jobs:
           retention-days: 1
           compression-level: 0
 
-      - name: Delete ephemeral Apple credentials
-        if: always()
+  signed-smoke:
+    name: Audit and launch signed bytes on a fresh credential-free runner
+    needs:
+      - validate
+      - apple-sign
+    runs-on: macos-15
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      CHANNEL: ${{ needs.validate.outputs.channel }}
+      VERSION: ${{ needs.validate.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "22.23.2"
+          cache: npm
+
+      - name: Test the public signed-payload policy
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts
+          npm audit --audit-level=moderate
+          npm test
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: zergchat-v2-macos-platform-signed
+          path: ${{ runner.temp }}/zergchat-signed-payload
+
+      - name: Audit and launch the signed universal application
         shell: bash
         run: |
-          set +e
-          keychain_path="$RUNNER_TEMP/zergchat-release.keychain-db"
-          original_keychain_path="$RUNNER_TEMP/zergchat-original-default-keychain"
-          if [[ -s "$original_keychain_path" ]]; then
-            original_keychain="$(cat "$original_keychain_path")"
-            security list-keychains -d user -s "$original_keychain"
-            security default-keychain -d user -s "$original_keychain"
+          set -euo pipefail
+          payload="$RUNNER_TEMP/zergchat-signed-payload"
+          archive="$payload/Zergchat_${VERSION}_universal.app.tar.gz"
+          dmg="$payload/Zergchat_${VERSION}_universal.dmg"
+          (
+            cd "$payload"
+            shasum -a 256 -c SHA256SUMS
+          )
+          extraction="$RUNNER_TEMP/zergchat-signed-smoke"
+          ARCHIVE_PATH="$archive" EXTRACTION_PATH="$extraction" \
+            node --input-type=module <<'NODE'
+          import { extractSourceApplication } from "./scripts/package-macos.mjs";
+
+          await extractSourceApplication({
+            archivePath: process.env.ARCHIVE_PATH,
+            outputDirectory: process.env.EXTRACTION_PATH,
+            maxArchiveBytes: 1_073_741_824,
+            maxEntryCount: 16_384,
+            maxFileBytes: 536_870_912,
+            maxUncompressedBytes: 2_147_483_648,
+          });
+          NODE
+          app="$extraction/Zergchat.app"
+          plist="$app/Contents/Info.plist"
+          executable="$app/Contents/MacOS/Zergchat"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$plist")" = \
+            "com.zergai.zergchat"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$plist")" = \
+            "$VERSION"
+          architectures="$(lipo -archs "$executable")"
+          test "$(wc -w <<<"$architectures" | tr -d ' ')" -eq 2
+          grep -qw arm64 <<<"$architectures"
+          grep -qw x86_64 <<<"$architectures"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign --verify --strict --verbose=2 "$dmg"
+          hdiutil verify "$dmg" >/dev/null
+          if [[ "$CHANNEL" == "stable" ]]; then
+            xcrun stapler validate "$app"
+            xcrun stapler validate "$dmg"
+            spctl --assess --type execute --verbose=4 "$app"
+            gatekeeper_output="$(spctl --assess --type open --context context:primary-signature \
+              --verbose=4 "$dmg" 2>&1)"
+            grep -F "source=Notarized Developer ID" <<<"$gatekeeper_output"
           fi
-          if [[ -f "$keychain_path" ]]; then
-            security delete-keychain "$keychain_path"
+
+          log="$RUNNER_TEMP/zergchat-signed-smoke.log"
+          "$executable" >"$log" 2>&1 &
+          app_pid=$!
+          cleanup() {
+            kill -TERM "$app_pid" 2>/dev/null || true
+            wait "$app_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          sleep 8
+          if ! kill -0 "$app_pid" 2>/dev/null; then
+            cat "$log"
+            echo "::error::The signed Zergchat application exited during launch smoke."
+            exit 1
           fi
-          rm -f \
-            "$RUNNER_TEMP/zergchat-developer-id.p12" \
-            "$RUNNER_TEMP"/AuthKey_*.p8 \
-            "$RUNNER_TEMP/zergchat-original-default-keychain"
+          cleanup
+          trap - EXIT
 
   sign-updater:
     name: Sign finished updater archive in the public trust boundary
     needs:
       - validate
-      - apple-sign
+      - signed-smoke
     runs-on: ubuntu-24.04
     environment:
       name: ${{ needs.validate.outputs.channel == 'stable' && 'zergchat-stable-updater' || 'zergchat-preview-updater' }}
@@ -726,6 +843,11 @@ jobs:
       - name: Revalidate provenance and the independent updater trust root
         run: |
           set -euo pipefail
+          (
+            cd release-input
+            sha256sum -c SHA256SUMS
+          )
+          rm -f release-input/SHA256SUMS
           node scripts/release-request.mjs "$REQUEST_PATH"
           if [[ "$CHANNEL" == "stable" ]]; then
             public_key="keys/zergchat-stable-updater.pubkey"
@@ -751,6 +873,7 @@ jobs:
           archive="release-input/Zergchat_${VERSION}_universal.app.tar.gz"
           test -f "$archive" && test ! -L "$archive"
           npm exec --offline -- tauri signer sign "$archive"
+          unset TAURI_SIGNING_PRIVATE_KEY TAURI_SIGNING_PRIVATE_KEY_PASSWORD
           test -s "${archive}.sig"
 
       - name: Verify the updater signature with the public trust root
