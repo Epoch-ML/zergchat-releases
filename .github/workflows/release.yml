@@ -253,6 +253,10 @@ jobs:
           const config = JSON.parse(
             await readFile(process.env.TAURI_CONFIG, "utf8"),
           );
+          assert.equal(
+            config.build.beforeBuildCommand,
+            "npm run generate && npm run verify:native-release-footprint",
+          );
           assert.equal(config.bundle.macOS.entitlements, "Entitlements.plist");
           assert.equal(config.bundle.macOS.infoPlist, "Info.plist");
           NODE
@@ -375,6 +379,8 @@ jobs:
           NODE
 
       - name: Build the unsigned app without release signing credentials
+        env:
+          NUXT_PUBLIC_API_BASE_URL: https://zergchat.com
         working-directory: source/zapps/zergchat
         run: |
           set -euo pipefail
