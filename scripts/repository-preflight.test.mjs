@@ -632,6 +632,29 @@ test("every ruleset identity, reference, bypass, and rule is exact", () => {
   }
 });
 
+test("malformed ruleset elements return controlled public diagnostics", () => {
+  for (const [label, value] of [
+    ["undefined", undefined],
+    ["number", 7],
+  ]) {
+    const state = idealState();
+    state.source.rulesets.push(value);
+    assert.deepEqual(
+      errorCodes(state),
+      ["source-ruleset-contract"],
+      `source/${label}`,
+    );
+  }
+
+  const release = idealState();
+  release.release.rulesets.push(7);
+  assert.deepEqual(
+    errorCodes(release),
+    ["ruleset-contract"],
+    "release/number",
+  );
+});
+
 test("repository-scoped release credentials are rejected independently", () => {
   const release = idealState();
   release.release.repositorySecrets.push("UNSCOPED_SIGNER");
