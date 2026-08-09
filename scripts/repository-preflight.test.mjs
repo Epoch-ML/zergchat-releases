@@ -12,6 +12,7 @@ import {
   requestGitHub,
   runRepositoryPreflight,
 } from "./repository-preflight.mjs";
+import { feedDestinations } from "./feed-policy.mjs";
 
 const preflightCli = fileURLToPath(
   new URL("./repository-preflight.mjs", import.meta.url),
@@ -123,6 +124,34 @@ const sourceRulesets = [
     bypass: [], rules: ["deletion", "update"] },
 ];
 
+function rootReleaseDataEntries() {
+  return [
+    { path: ".nojekyll", mode: "100644", type: "blob", size: 0 },
+    { path: "index.html", mode: "100644", type: "blob", size: 512 },
+  ];
+}
+
+function channelReleaseDataEntries(channel, version) {
+  return [
+    { path: channel, mode: "040000", type: "tree" },
+    { path: `${channel}/latest.json`, mode: "100644", type: "blob", size: 2_048 },
+    { path: `${channel}/releases`, mode: "040000", type: "tree" },
+    {
+      path: `${channel}/releases/${version}.json`,
+      mode: "100644",
+      type: "blob",
+      size: 4_096,
+    },
+  ];
+}
+
+function releaseDataEntries() {
+  return [
+    ...rootReleaseDataEntries(),
+    ...channelReleaseDataEntries("preview", "0.1.9-preview.1"),
+  ];
+}
+
 function idealState(releaseState = "disabled_manually") {
   return structuredClone({
     release: {
@@ -136,11 +165,7 @@ function idealState(releaseState = "disabled_manually") {
       feedBranch: {
         name: "release-data", sha: "a".repeat(40), tree_sha: "b".repeat(40),
         truncated: false,
-        entries: [
-          { path: "site", mode: "040000", type: "tree" },
-          { path: "site/.nojekyll", mode: "100644", type: "blob" },
-          { path: "site/index.html", mode: "100644", type: "blob" },
-        ],
+        entries: releaseDataEntries(),
       },
       workflows: [
         { path: ".github/workflows/release.yml", state: releaseState },
@@ -416,7 +441,34 @@ test("feed and source deploy-key authority is exact", () => {
   assert.deepEqual(errorCodes(duplicateSourceReader), ["source-key"]);
 });
 
-test("every bounded release-data branch invariant is enforced", () => {
+test("release-data has one bounded root topology shared with feed publication", () => {
+  for (const [channel, version] of [["preview", "0.1.9-preview.1"]]) {
+    const destinations = feedDestinations(channel, version);
+    const paths = idealState().release.feedBranch.entries.map(({ path }) => path);
+    assert.equal(paths.includes(destinations.latest), true, destinations.latest);
+    assert.equal(paths.includes(destinations.metadata), true, destinations.metadata);
+  }
+
+  const bootstrap = idealState();
+  bootstrap.release.feedBranch.entries = rootReleaseDataEntries();
+  assert.equal(errorCodes(bootstrap).includes("feed-branch-contract"), false);
+  const liveBootstrap = idealState("active");
+  liveBootstrap.release.feedBranch.entries = rootReleaseDataEntries();
+  assert.deepEqual(errorCodes(liveBootstrap, "live"), ["feed-branch-contract"]);
+
+  const stableOnly = idealState("active");
+  stableOnly.release.feedBranch.entries = [
+    ...rootReleaseDataEntries(),
+    ...channelReleaseDataEntries("stable", "0.1.9"),
+  ];
+  assert.equal(errorCodes(stableOnly, "live").includes("feed-branch-contract"), false);
+
+  const bothChannels = idealState("active");
+  bothChannels.release.feedBranch.entries.push(
+    ...channelReleaseDataEntries("stable", "0.1.9"),
+  );
+  assert.equal(errorCodes(bothChannels, "live").includes("feed-branch-contract"), false);
+
   const mutations = [
     (branch) => { branch.name = "main"; },
     (branch) => { branch.sha = `x${"a".repeat(40)}`; },
@@ -424,19 +476,26 @@ test("every bounded release-data branch invariant is enforced", () => {
     (branch) => { branch.truncated = true; },
     (branch) => { branch.entries = []; },
     (branch) => { branch.entries.push(structuredClone(branch.entries[0])); },
-    (branch) => { branch.entries[1] = null; },
-    (branch) => { branch.entries[1] = []; },
-    (branch) => { branch.entries[0].mode = "100644"; },
-    (branch) => { branch.entries[0].type = "blob"; },
-    (branch) => { branch.entries[1].path = "outside/policy.mjs"; },
+    (branch) => { branch.entries[3] = null; },
+    (branch) => { branch.entries[3] = []; },
+    (branch) => { branch.entries[2].mode = "100644"; },
+    (branch) => { branch.entries[2].type = "blob"; },
+    (branch) => { branch.entries[3].path = "site/preview/latest.json"; },
     (branch) => { branch.entries[1].path = ""; },
     (branch) => { branch.entries[1].path = 7; },
     (branch) => { branch.entries[1].mode = "100755"; },
     (branch) => { branch.entries[1].type = "commit"; },
-    (branch) => { branch.entries[1].path = `site/${"x".repeat(508)}`; },
+    (branch) => { branch.entries[1].path = "x".repeat(513); },
+    (branch) => { branch.entries[0].size = 1; },
+    (branch) => { branch.entries[1].size = 0; },
+    (branch) => { branch.entries[3].size = 1_048_577; },
+    (branch) => { branch.entries[3].size = 1.5; },
+    (branch) => { branch.entries[3].size = "2048"; },
+    (branch) => { branch.entries[2].size = 0; },
+    (branch) => { branch.entries[5].path = "preview/releases/0.1.9.json"; },
     (branch) => {
       branch.entries = branch.entries.filter(
-        ({ path }) => path !== "site/index.html",
+        ({ path }) => path !== "preview/latest.json",
       );
     },
   ];
@@ -452,48 +511,49 @@ test("every bounded release-data branch invariant is enforced", () => {
     assert.deepEqual(errorCodes(state), ["feed-branch-contract"]);
   }
 
-  for (const requiredPath of ["site", "site/.nojekyll", "site/index.html"]) {
+  for (const requiredPath of [
+    ".nojekyll",
+    "index.html",
+  ]) {
     const missing = idealState();
     missing.release.feedBranch.entries = missing.release.feedBranch.entries
       .filter(({ path }) => path !== requiredPath);
-    missing.release.feedBranch.entries.push({
-      path: `site/replacement-${missing.release.feedBranch.entries.length}.json`,
-      mode: "100644",
-      type: "blob",
-    });
     assert.deepEqual(errorCodes(missing), ["feed-branch-contract"], requiredPath);
   }
 
-  const nestedDirectory = idealState();
-  nestedDirectory.release.feedBranch.entries.push({
-    path: "site/releases", mode: "040000", type: "tree",
+  const unexpectedRoot = idealState();
+  unexpectedRoot.release.feedBranch.entries.push({
+    path: "site", mode: "040000", type: "tree",
   });
-  assert.equal(errorCodes(nestedDirectory).includes("feed-branch-contract"), false);
-  nestedDirectory.release.feedBranch.entries.at(-1).mode = "100644";
-  assert.deepEqual(errorCodes(nestedDirectory), ["feed-branch-contract"]);
-  nestedDirectory.release.feedBranch.entries.at(-1).mode = "040000";
-  nestedDirectory.release.feedBranch.entries.at(-1).type = "blob";
-  assert.deepEqual(errorCodes(nestedDirectory), ["feed-branch-contract"]);
+  assert.deepEqual(errorCodes(unexpectedRoot), ["feed-branch-contract"]);
 
-  const exactPathLimit = idealState();
-  exactPathLimit.release.feedBranch.entries.push({
-    path: `site/${"x".repeat(507)}`, mode: "100644", type: "blob",
-  });
-  assert.equal(errorCodes(exactPathLimit).includes("feed-branch-contract"), false);
-  exactPathLimit.release.feedBranch.entries.at(-1).path =
-    `site/${"x".repeat(508)}`;
-  assert.deepEqual(errorCodes(exactPathLimit), ["feed-branch-contract"]);
+  const aggregateOverflow = idealState();
+  for (let patch = 0; patch < 65; patch += 1) {
+    aggregateOverflow.release.feedBranch.entries.push({
+      path: `preview/releases/9.9.${patch}-preview.1.json`,
+      mode: "100644",
+      type: "blob",
+      size: 1_048_576,
+    });
+  }
+  assert.deepEqual(errorCodes(aggregateOverflow), ["feed-branch-contract"]);
 
   const exactLimit = idealState();
   while (exactLimit.release.feedBranch.entries.length < 4_096) {
     const index = exactLimit.release.feedBranch.entries.length;
     exactLimit.release.feedBranch.entries.push({
-      path: `site/generated/${index}.json`, mode: "100644", type: "blob",
+      path: `preview/releases/99.0.${index}-preview.1.json`,
+      mode: "100644",
+      type: "blob",
+      size: 1,
     });
   }
   assert.equal(errorCodes(exactLimit).includes("feed-branch-contract"), false);
   exactLimit.release.feedBranch.entries.push({
-    path: "site/generated/overflow.json", mode: "100644", type: "blob",
+    path: "preview/releases/99.0.4096-preview.1.json",
+    mode: "100644",
+    type: "blob",
+    size: 1,
   });
   assert.deepEqual(errorCodes(exactLimit), ["feed-branch-contract"]);
 });
@@ -614,11 +674,7 @@ test("the collector normalizes settings through one injected HTTP boundary", asy
     }],
     [`Epoch-ML/zergchat-releases:git/trees/${"b".repeat(40)}?recursive=1`, {
       truncated: false,
-      tree: [
-        { path: "site/index.html", mode: "100644", type: "blob" },
-        { path: "site", mode: "040000", type: "tree" },
-        { path: "site/.nojekyll", mode: "100644", type: "blob" },
-      ],
+      tree: releaseDataEntries().toReversed(),
     }],
     ["Epoch-ML/zergchat-releases:actions/workflows", { workflows: [{
       path: ".github/workflows/release.yml", state: "disabled_manually",
@@ -710,11 +766,7 @@ test("the collector normalizes settings through one injected HTTP boundary", asy
   assert.deepEqual(state.release.feedBranch, {
     name: "release-data", sha: "a".repeat(40), tree_sha: "b".repeat(40),
     truncated: false,
-    entries: [
-      { path: "site", mode: "040000", type: "tree" },
-      { path: "site/.nojekyll", mode: "100644", type: "blob" },
-      { path: "site/index.html", mode: "100644", type: "blob" },
-    ],
+    entries: releaseDataEntries(),
   });
   assert.deepEqual(state.release.environments["zergchat-feed"], {
     secrets: ["A_SECRET", "Z_SECRET"], refs: ["branch:main"],
