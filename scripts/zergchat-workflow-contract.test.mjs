@@ -126,4 +126,66 @@ describe("ZergChat source-build release contract", () => {
     assert.match(collect.run, /darwin-aarch64/);
     assert.match(collect.run, /darwin-x86_64/);
   });
+
+  it("destroys Apple credentials before credential-free payload packaging", () => {
+    const apple = requireJob("apple-sign");
+    const signingIndex = apple.steps.findIndex(
+      (step) => step.name === "Apply preview ad-hoc or fail-closed stable Apple signing",
+    );
+    const cleanupIndex = apple.steps.findIndex(
+      (step) => step.name === "Delete ephemeral Apple credentials",
+    );
+    const packageIndex = apple.steps.findIndex(
+      (step) => step.name === "Package the credential-free signed payload",
+    );
+    const uploadIndex = apple.steps.findIndex(
+      (step) => step.uses?.startsWith("actions/upload-artifact@"),
+    );
+    assert.ok(
+      signingIndex >= 0 && signingIndex < cleanupIndex && cleanupIndex < packageIndex &&
+        packageIndex < uploadIndex,
+      "Apple cleanup must separate signing from packaging and artifact upload",
+    );
+
+    const signing = apple.steps[signingIndex];
+    const cleanup = apple.steps[cleanupIndex];
+    const packaging = apple.steps[packageIndex];
+    assert.equal(cleanup.if, "always()");
+    assert.doesNotMatch(signing.run, /package-macos\.mjs|build-metadata\.json/);
+    assert.doesNotMatch(JSON.stringify(packaging), /secrets\.|ZERGCHAT_APPLE_/);
+    assert.match(packaging.run, /Zergchat_\$\{VERSION\}_universal\.app\.tar\.gz/);
+    assert.match(packaging.run, /darwin-universal/);
+    assert.match(packaging.run, /SHA256SUMS/);
+  });
+
+  it("gates updater signing on a fresh secret-free signed-app smoke", () => {
+    const smoke = requireJob("signed-smoke");
+    assert.deepEqual(smoke.needs, ["validate", "apple-sign"]);
+    assert.equal(smoke["runs-on"], "macos-15");
+    assert.equal(smoke.environment, undefined);
+    assert.deepEqual(smoke.permissions, { contents: "read" });
+    assert.doesNotMatch(JSON.stringify(smoke), /secrets\.|ZERGCHAT_APPLE_|TAURI_SIGNING_PRIVATE_KEY/);
+
+    const audit = requireStep(smoke, "Audit and launch the signed universal application");
+    for (const token of [
+      "shasum -a 256 -c SHA256SUMS",
+      "lipo -archs",
+      "arm64",
+      "x86_64",
+      "codesign --verify --deep --strict",
+      "hdiutil verify",
+      "stapler validate",
+      "spctl --assess",
+      "kill -0 \"$app_pid\"",
+    ]) {
+      assert.ok(audit.run.includes(token), `signed smoke must execute ${token}`);
+    }
+
+    const updater = requireJob("sign-updater");
+    assert.deepEqual(updater.needs, ["validate", "signed-smoke"]);
+    const sign = requireStep(updater, "Sign only the finished updater archive");
+    const signIndex = sign.run.indexOf("tauri signer sign");
+    const unsetIndex = sign.run.indexOf("unset TAURI_SIGNING_PRIVATE_KEY");
+    assert.ok(signIndex >= 0 && unsetIndex > signIndex);
+  });
 });

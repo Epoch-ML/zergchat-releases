@@ -721,7 +721,7 @@ describe("Zergchat release workflow contract", () => {
     assert.match(workflow, /npm audit --omit=dev --audit-level=moderate/);
     assert.equal(
       workflow.match(/npm audit --audit-level=moderate/g)?.length,
-      5,
+      6,
     );
   });
 });
