@@ -222,15 +222,15 @@ describe("Zergchat release workflow contract", () => {
     assert.match(workflow, /Zergchat_\$\{VERSION\}_universal\.dmg/);
   });
 
-  it("publishes immutable assets and only channel-scoped v2 Pages feeds", () => {
+  it("publishes immutable assets and only channel-scoped Pages feeds", () => {
     assert.match(workflow, /gh release create/);
     assert.match(workflow, /curl --fail --location/);
     assert.match(workflow, /cmp --silent/);
     assert.match(workflow, /--branch release-data/);
     assert.match(workflow, /node release-repository\/scripts\/feed-policy\.mjs/);
-    assert.match(workflow, /latest-stable\.json/);
-    assert.match(workflow, /latest-canary\.json/);
-    assert.match(workflow, /Legacy root feeds changed/);
+    assert.doesNotMatch(workflow, /latest-stable\.json/);
+    assert.doesNotMatch(workflow, /latest-canary\.json/);
+    assert.doesNotMatch(workflow, /Legacy root feeds changed/);
     assert.match(workflow, /encodeURIComponent\(process\.env\.RELEASE_TAG\)/);
     assert.match(workflow, /browser_download_url/);
     assert.match(workflow, /scripts\/validate-release-asset-url\.mjs/);
