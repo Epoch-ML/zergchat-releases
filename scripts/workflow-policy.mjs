@@ -585,12 +585,24 @@ export function auditWorkflowPolicy(source) {
   );
 }
 
+export function auditPolicyWorkflow(source) {
+  parseWorkflow(source);
+  return [];
+}
+
 async function main() {
-  if (process.argv.length !== 3) {
-    throw new WorkflowPolicyError("usage: workflow-policy.mjs WORKFLOW.yml");
+  if (
+    process.argv.length !== 3 &&
+    !(process.argv.length === 4 && process.argv[3] === "--policy-ci")
+  ) {
+    throw new WorkflowPolicyError(
+      "usage: workflow-policy.mjs WORKFLOW.yml [--policy-ci]",
+    );
   }
   const source = await readFileAsync(process.argv[2], "utf8");
-  const diagnostics = auditWorkflowPolicy(source);
+  const diagnostics = process.argv[3] === "--policy-ci"
+    ? auditPolicyWorkflow(source)
+    : auditWorkflowPolicy(source);
   process.stdout.write(`${JSON.stringify({ diagnostics }, null, 2)}\n`);
   if (diagnostics.length > 0) process.exitCode = 1;
 }
