@@ -42,7 +42,7 @@ export default {
   reporters: ["clear-text", "progress", "json"],
   jsonReporter: { fileName: `reports/mutation-policy-${selected}.json` },
   thresholds: { high: 90, low: 80, break: 0 },
-  timeoutMS: 60_000,
+  timeoutMS: 10_000,
   tempDirName: `.stryker-tmp/${selected}`,
   cleanTempDir: "always",
 };
