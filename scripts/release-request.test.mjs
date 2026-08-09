@@ -20,20 +20,22 @@ import {
 
 const sourceSha = "0123456789abcdef0123456789abcdef01234567";
 const requestedAt = "2026-08-05T20:00:00.000Z";
+const updaterPublicKeySha256 = "a".repeat(64);
 const temporaryDirectories = [];
 const execFileAsync = promisify(execFile);
 
 function makeRequest(overrides = {}) {
   return {
     schema_version: 1,
-    product: "Zergchat",
+    product: "zergchat-desktop",
     channel: "preview",
-    version: "0.2.0-preview.1",
-    release_tag: "zergchat-preview-v0.2.0-preview.1",
+    version: "0.1.9-preview.1",
+    release_tag: "zergchat-preview-v0.1.9-preview.1",
     source_repository: "Epoch-ML/zerg",
     source_sha: sourceSha,
-    source_ref: "refs/tags/zergchat-preview-v0.2.0-preview.1",
+    source_ref: "refs/tags/zergchat-preview-v0.1.9-preview.1",
     requested_at: requestedAt,
+    updater_public_key_sha256: updaterPublicKeySha256,
     ...overrides,
   };
 }
@@ -47,17 +49,18 @@ afterEach(async () => {
 describe("Zergchat release request validation", () => {
   it("accepts one canonical preview request and derives immutable build metadata", () => {
     const result = validateReleaseRequest(makeRequest(), {
-      requestFilename: "zergchat-preview-v0.2.0-preview.1.json",
+      requestFilename: "zergchat-preview-v0.1.9-preview.1.json",
     });
 
     assert.deepEqual(result, {
       channel: "preview",
       requestedAt,
-      releaseTag: "zergchat-preview-v0.2.0-preview.1",
-      sourceRef: "refs/tags/zergchat-preview-v0.2.0-preview.1",
+      releaseTag: "zergchat-preview-v0.1.9-preview.1",
+      sourceRef: "refs/tags/zergchat-preview-v0.1.9-preview.1",
       sourceRepository: "Epoch-ML/zerg",
       sourceSha,
-      version: "0.2.0-preview.1",
+      updaterPublicKeySha256,
+      version: "0.1.9-preview.1",
     });
   });
 
@@ -121,7 +124,7 @@ describe("Zergchat release request validation", () => {
     assert.equal(new ReleaseRequestError("problem").name, "ReleaseRequestError");
   });
 
-  it("enforces anchored SemVer and SHA boundaries while accepting full identifiers", () => {
+  it("enforces channel-specific SemVer, SHA, and updater-root boundaries", () => {
     const invalidVersions = [
       "v0.2.0",
       "x0.2.0",
@@ -134,6 +137,10 @@ describe("Zergchat release request validation", () => {
       "1.2.3-01",
       "1.2.3+",
       "1.2.3+build.",
+      "1.2.3-rc.1",
+      "1.2.3-preview.0",
+      "1.2.3-preview.01",
+      "1.2.3-preview.1+rebuilt",
     ];
     for (const version of invalidVersions) {
       assert.throws(
@@ -142,23 +149,10 @@ describe("Zergchat release request validation", () => {
           release_tag: "zergchat-preview-v" + version,
           source_ref: "refs/tags/zergchat-preview-v" + version,
         })),
-        /version must be strict SemVer/,
+        /preview release versions must use MAJOR\.MINOR\.PATCH-preview\.N/,
       );
     }
-
-    const fullVersion = "123.234.345-alpha.10.x-1+build.7";
-    const full = validateReleaseRequest(makeRequest({
-      version: fullVersion,
-      release_tag: "zergchat-preview-v" + fullVersion,
-      source_ref: "refs/tags/zergchat-preview-v" + fullVersion,
-    }));
-    assert.equal(full.version, fullVersion);
-    const oneCharacterBuild = "1.2.3+x";
-    assert.equal(validateReleaseRequest(makeRequest({
-      version: oneCharacterBuild,
-      release_tag: "zergchat-preview-v" + oneCharacterBuild,
-      source_ref: "refs/tags/zergchat-preview-v" + oneCharacterBuild,
-    })).version, oneCharacterBuild);
+    assert.equal(validateReleaseRequest(makeRequest()).version, "0.1.9-preview.1");
 
     for (const source_sha of ["x" + sourceSha, sourceSha + "0"]) {
       assert.throws(
@@ -167,24 +161,40 @@ describe("Zergchat release request validation", () => {
       );
     }
     assert.equal(validateReleaseRequest(makeRequest()).sourceSha, sourceSha);
+
+    for (const updater_public_key_sha256 of [
+      "f".repeat(63),
+      "f".repeat(65),
+      "F".repeat(64),
+      "g".repeat(64),
+    ]) {
+      assert.throws(
+        () => validateReleaseRequest(makeRequest({ updater_public_key_sha256 })),
+        /updater public key SHA-256 must contain exactly 64 lowercase hexadecimal characters/,
+      );
+    }
+    assert.equal(
+      validateReleaseRequest(makeRequest()).updaterPublicKeySha256,
+      updaterPublicKeySha256,
+    );
   });
 
   it("rejects schema drift, malformed provenance, and a mismatched filename", () => {
     assert.throws(
       () => validateReleaseRequest(makeRequest({
-        release_tag: "zergchat-preview-v0.2.0-preview.2",
+        release_tag: "zergchat-preview-v0.1.9-preview.2",
       })),
-      /release tag must be zergchat-preview-v0.2.0-preview.1/,
+      /release tag must be zergchat-preview-v0.1.9-preview.1/,
     );
     assert.throws(
       () => validateReleaseRequest(makeRequest({ unexpected: true }), {
-        requestFilename: "zergchat-preview-v0.2.0-preview.1.json",
+        requestFilename: "zergchat-preview-v0.1.9-preview.1.json",
       }),
       /unexpected release request field: unexpected/,
     );
     assert.throws(
       () => validateReleaseRequest(makeRequest({ source_sha: "too-short" }), {
-        requestFilename: "zergchat-preview-v0.2.0-preview.1.json",
+        requestFilename: "zergchat-preview-v0.1.9-preview.1.json",
       }),
       /source SHA must contain exactly 40 lowercase hexadecimal characters/,
     );
@@ -192,16 +202,16 @@ describe("Zergchat release request validation", () => {
       () => validateReleaseRequest(makeRequest(), {
         requestFilename: "wrong.json",
       }),
-      /request filename must be zergchat-preview-v0.2.0-preview.1.json/,
+      /request filename must be zergchat-preview-v0.1.9-preview.1.json/,
     );
   });
 
   it("rejects another product, repository, channel, ref, or non-canonical timestamp", () => {
     const invalidRequests = [
-      [makeRequest({ product: "Other" }), /product must be Zergchat/],
+      [makeRequest({ product: "Other" }), /product must be zergchat-desktop/],
       [makeRequest({ source_repository: "Epoch-ML/other" }), /source repository must be Epoch-ML\/zerg/],
       [makeRequest({ channel: "nightly" }), /channel must be preview or stable/],
-      [makeRequest({ source_ref: "refs/heads/main" }), /source ref must be refs\/tags\/zergchat-preview-v0.2.0-preview.1/],
+      [makeRequest({ source_ref: "refs/heads/main" }), /source ref must be refs\/tags\/zergchat-preview-v0.1.9-preview.1/],
       [makeRequest({ requested_at: "not-a-date" }), /timestamp must be canonical ISO-8601/],
       [makeRequest({ requested_at: "2026-08-05T20:00:00Z" }), /timestamp must be canonical ISO-8601/],
       [makeRequest({ requested_at: "2026-08-05 20:00:00Z" }), /timestamp must be canonical ISO-8601/],
@@ -224,17 +234,17 @@ describe("Zergchat release request validation", () => {
   it("parses a request file while rejecting malformed JSON", async () => {
     const directory = await mkdtemp(join(tmpdir(), "zergchat-public-request-test-"));
     temporaryDirectories.push(directory);
-    const validPath = join(directory, "zergchat-preview-v0.2.0-preview.1.json");
-    const invalidPath = join(directory, "zergchat-preview-v0.2.0-preview.2.json");
+    const validPath = join(directory, "zergchat-preview-v0.1.9-preview.1.json");
+    const invalidPath = join(directory, "zergchat-preview-v0.1.9-preview.2.json");
     const wrongNamePath = join(directory, "wrong.json");
-    const symlinkPath = join(directory, "zergchat-preview-v0.2.0-preview.3.json");
+    const symlinkPath = join(directory, "zergchat-preview-v0.1.9-preview.3.json");
     await writeFile(validPath, `${JSON.stringify(makeRequest(), null, 2)}\n`);
     await writeFile(invalidPath, "{ invalid json\n");
     await writeFile(wrongNamePath, JSON.stringify(makeRequest()));
     await symlink(validPath, symlinkPath);
 
     const request = await validateRequestFile(validPath);
-    assert.equal(request.releaseTag, "zergchat-preview-v0.2.0-preview.1");
+    assert.equal(request.releaseTag, "zergchat-preview-v0.1.9-preview.1");
     await assert.rejects(validateRequestFile(invalidPath), /valid JSON/);
     await assert.rejects(validateRequestFile(wrongNamePath), /request filename must be/);
     await assert.rejects(
@@ -254,7 +264,7 @@ describe("Zergchat release request validation", () => {
   it("emits every validated CLI output and fails without an input path", async () => {
     const directory = await mkdtemp(join(tmpdir(), "zergchat-request-cli-test-"));
     temporaryDirectories.push(directory);
-    const requestPath = join(directory, "zergchat-preview-v0.2.0-preview.1.json");
+    const requestPath = join(directory, "zergchat-preview-v0.1.9-preview.1.json");
     const outputPath = join(directory, "github-output.txt");
     await writeFile(requestPath, JSON.stringify(makeRequest()));
     await writeFile(outputPath, "");
@@ -266,24 +276,26 @@ describe("Zergchat release request validation", () => {
     assert.deepEqual(JSON.parse(execution.stdout), {
       channel: "preview",
       requestedAt,
-      releaseTag: "zergchat-preview-v0.2.0-preview.1",
-      sourceRef: "refs/tags/zergchat-preview-v0.2.0-preview.1",
+      releaseTag: "zergchat-preview-v0.1.9-preview.1",
+      sourceRef: "refs/tags/zergchat-preview-v0.1.9-preview.1",
       sourceRepository: "Epoch-ML/zerg",
       sourceSha,
-      version: "0.2.0-preview.1",
+      updaterPublicKeySha256,
+      version: "0.1.9-preview.1",
     });
     const withoutOutput = await execFileAsync(process.execPath, [scriptPath, requestPath], {
       env: { ...process.env, GITHUB_OUTPUT: "" },
     });
-    assert.equal(JSON.parse(withoutOutput.stdout).releaseTag, "zergchat-preview-v0.2.0-preview.1");
+    assert.equal(JSON.parse(withoutOutput.stdout).releaseTag, "zergchat-preview-v0.1.9-preview.1");
     assert.equal(await readFile(outputPath, "utf8"), [
       "channel=preview",
       "requested_at=" + requestedAt,
-      "release_tag=zergchat-preview-v0.2.0-preview.1",
-      "source_ref=refs/tags/zergchat-preview-v0.2.0-preview.1",
+      "release_tag=zergchat-preview-v0.1.9-preview.1",
+      "source_ref=refs/tags/zergchat-preview-v0.1.9-preview.1",
       "source_repository=Epoch-ML/zerg",
       "source_sha=" + sourceSha,
-      "version=0.2.0-preview.1",
+      "updater_public_key_sha256=" + updaterPublicKeySha256,
+      "version=0.1.9-preview.1",
       "",
     ].join("\n"));
 
