@@ -89,7 +89,7 @@ jobs:
           candidate_path="$RUNNER_TEMP/candidate-release.yml"
           set +o pipefail
           git -C "$repository" -c core.hooksPath=/dev/null \
-            diff --name-only -z "$BASE_SHA...$HEAD_SHA" \
+            diff --name-only --no-renames -z "$BASE_SHA...$HEAD_SHA" \
             | head -c 262145 >"$diff_path"
           pipeline_status=("${PIPESTATUS[@]}")
           set -o pipefail
