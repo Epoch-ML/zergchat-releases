@@ -11,6 +11,28 @@ const SOURCE_POLICY_ANCHOR =
   ".github/workflows/zergchat-release-policy-anchor.yml";
 const CANONICAL_PAGES_URL = "https://epoch-ml.github.io/zergchat-releases/";
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
+const MAX_RELEASE_DATA_ENTRIES = 4_096;
+const MAX_RELEASE_DATA_FILE_BYTES = 1_048_576;
+const MAX_RELEASE_DATA_TOTAL_BYTES = 67_108_864;
+const STABLE_METADATA_PATH_PATTERN =
+  /^stable\/releases\/(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.json$/;
+const PREVIEW_METADATA_PATH_PATTERN =
+  /^preview\/releases\/(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)-preview\.(?:[1-9]\d*)\.json$/;
+const REQUIRED_RELEASE_DATA_DIRECTORIES = new Set([
+  "preview",
+  "preview/releases",
+  "stable",
+  "stable/releases",
+]);
+const REQUIRED_RELEASE_DATA_BLOBS = new Set([
+  ".nojekyll",
+  "index.html",
+]);
+const ALLOWED_FIXED_RELEASE_DATA_BLOBS = new Set([
+  ...REQUIRED_RELEASE_DATA_BLOBS,
+  "preview/latest.json",
+  "stable/latest.json",
+]);
 
 const EXPECTED_ENVIRONMENTS = Object.freeze({
   "zergchat-preview-build": Object.freeze({
@@ -287,7 +309,7 @@ function environmentMatches(actual, expected) {
     actual.wait_timer === expected.wait_timer;
 }
 
-function isBoundedFeedBranch(feedBranch) {
+function isBoundedFeedBranch(feedBranch, { requireChannel }) {
   if (
     feedBranch === null ||
     typeof feedBranch !== "object" ||
@@ -297,12 +319,15 @@ function isBoundedFeedBranch(feedBranch) {
     !SHA_PATTERN.test(feedBranch.tree_sha) ||
     feedBranch.truncated !== false ||
     !Array.isArray(feedBranch.entries) ||
-    feedBranch.entries.length < 3 ||
-    feedBranch.entries.length > 4_096
+    feedBranch.entries.length < 2 ||
+    feedBranch.entries.length > MAX_RELEASE_DATA_ENTRIES
   ) {
     return false;
   }
   const paths = new Set();
+  let aggregateBytes = 0;
+  let previewMetadataCount = 0;
+  let stableMetadataCount = 0;
   for (const entry of feedBranch.entries) {
     if (
       entry === null ||
@@ -316,18 +341,66 @@ function isBoundedFeedBranch(feedBranch) {
       return false;
     }
     paths.add(entry.path);
-    if (entry.path === "site") {
-      if (entry.type !== "tree" || entry.mode !== "040000") return false;
+
+    if (REQUIRED_RELEASE_DATA_DIRECTORIES.has(entry.path)) {
+      if (
+        entry.type !== "tree" ||
+        entry.mode !== "040000" ||
+        entry.size !== undefined
+      ) {
+        return false;
+      }
       continue;
     }
-    if (!entry.path.startsWith("site/")) return false;
-    const regularBlob = entry.type === "blob" && entry.mode === "100644";
-    const directory = entry.type === "tree" && entry.mode === "040000";
-    if (!regularBlob && !directory) return false;
+
+    const previewMetadata = PREVIEW_METADATA_PATH_PATTERN.test(entry.path);
+    const stableMetadata = STABLE_METADATA_PATH_PATTERN.test(entry.path);
+    if (
+      !ALLOWED_FIXED_RELEASE_DATA_BLOBS.has(entry.path) &&
+      !previewMetadata &&
+      !stableMetadata
+    ) {
+      return false;
+    }
+    if (
+      entry.type !== "blob" ||
+      entry.mode !== "100644" ||
+      !Number.isSafeInteger(entry.size) ||
+      entry.size < 0 ||
+      entry.size > MAX_RELEASE_DATA_FILE_BYTES
+    ) {
+      return false;
+    }
+    if (entry.path === ".nojekyll" && entry.size !== 0) return false;
+    if (entry.path !== ".nojekyll" && entry.size === 0) return false;
+    aggregateBytes += entry.size;
+    if (!Number.isSafeInteger(aggregateBytes) ||
+        aggregateBytes > MAX_RELEASE_DATA_TOTAL_BYTES) {
+      return false;
+    }
+    if (previewMetadata) previewMetadataCount += 1;
+    if (stableMetadata) stableMetadataCount += 1;
   }
-  return paths.has("site") &&
-    paths.has("site/.nojekyll") &&
-    paths.has("site/index.html");
+  if (![...REQUIRED_RELEASE_DATA_BLOBS].every((path) => paths.has(path))) {
+    return false;
+  }
+  const channelComplete = (channel, metadataCount) => {
+    const channelPaths = [
+      channel,
+      `${channel}/latest.json`,
+      `${channel}/releases`,
+    ];
+    const present = [...paths].some(
+      (path) => path === channel || path.startsWith(`${channel}/`),
+    );
+    return !present ||
+      (channelPaths.every((path) => paths.has(path)) && metadataCount > 0);
+  };
+  const previewPresent = paths.has("preview");
+  const stablePresent = paths.has("stable");
+  return channelComplete("preview", previewMetadataCount) &&
+    channelComplete("stable", stableMetadataCount) &&
+    (!requireChannel || previewPresent || stablePresent);
 }
 
 export function auditRepositoryState(state, { phase } = {}) {
@@ -365,10 +438,12 @@ export function auditRepositoryState(state, { phase } = {}) {
       "Pages must publish the canonical public HTTPS origin",
     ));
   }
-  if (!isBoundedFeedBranch(release.feedBranch)) {
+  if (!isBoundedFeedBranch(release.feedBranch, {
+    requireChannel: phase === "live",
+  })) {
     errors.push(diagnostic(
       "feed-branch-contract",
-      "release-data must contain only a bounded site tree",
+      "release-data must contain only the bounded root updater-feed topology",
     ));
   }
 
@@ -788,11 +863,13 @@ export async function collectRepositoryState({
       truncated: treeDocument.truncated,
       entries: requireArray(treeDocument.tree, "release-data tree entries")
         .map((entry) => {
-          const { path, mode, type } = requireObject(
+          const { path, mode, type, size } = requireObject(
             entry,
             "release-data tree entry",
           );
-          return { path, mode, type };
+          return type === "blob"
+            ? { path, mode, type, size }
+            : { path, mode, type };
         }).sort((left, right) => left.path.localeCompare(right.path)),
     };
   }
