@@ -514,6 +514,29 @@ test("every ruleset identity, reference, bypass, and rule is exact", () => {
     false,
   );
 
+  const unrelatedZtcTags = idealState();
+  unrelatedZtcTags.source.rulesets.push(
+    {
+      name: "ZTC release tag authority",
+      enforcement: "active",
+      target: "tag",
+      include: ["refs/tags/ztc-v*"],
+      exclude: [],
+      bypass: [reviewerBypass],
+      rules: ["creation"],
+    },
+    {
+      name: "ZTC release tag immutability",
+      enforcement: "active",
+      target: "tag",
+      include: ["refs/tags/ztc-v*"],
+      exclude: [],
+      bypass: [],
+      rules: ["deletion", "update"],
+    },
+  );
+  assert.deepEqual(errorCodes(unrelatedZtcTags), []);
+
   const zergchatScopedSource = idealState();
   zergchatScopedSource.source.rulesets.push({
     name: "Dormant desktop exception",
