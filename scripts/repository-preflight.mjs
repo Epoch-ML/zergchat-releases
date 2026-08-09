@@ -888,22 +888,34 @@ export async function collectRepositoryState({
   };
 }
 
-async function main() {
-  const phase = process.argv[2];
-  if (
-    process.argv.length !== 3 ||
-    (phase !== "cutover" && phase !== "live")
-  ) {
+export async function runRepositoryPreflight(
+  args,
+  {
+    collect = collectRepositoryState,
+    write = (output) => process.stdout.write(output),
+  } = {},
+) {
+  if (!Array.isArray(args) || args.length !== 1) {
+    throw new RepositoryPreflightError(
+      "usage: repository-preflight.mjs cutover|live",
+    );
+  }
+  const phase = args[0];
+  if (phase !== "cutover" && phase !== "live") {
     throw new RepositoryPreflightError(
       "usage: repository-preflight.mjs cutover|live",
     );
   }
   const result = auditRepositoryState(
-    await collectRepositoryState(),
+    await collect(),
     { phase },
   );
-  process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-  if (result.errors.length > 0) process.exitCode = 1;
+  write(`${JSON.stringify(result, null, 2)}\n`);
+  return result.errors.length > 0 ? 1 : 0;
+}
+
+async function main() {
+  process.exitCode = await runRepositoryPreflight(process.argv.slice(2));
 }
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
