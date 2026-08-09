@@ -189,6 +189,44 @@ describe("ZergChat source-build release contract", () => {
     assert.ok(signIndex >= 0 && unsetIndex > signIndex);
   });
 
+  it("isolates preview and stable updater credentials on separate runners", () => {
+    const preview = requireJob("sign-updater-preview");
+    const stable = requireJob("sign-updater-stable");
+    const aggregate = requireJob("sign-updater");
+
+    assert.equal(preview.environment, "zergchat-preview-updater");
+    assert.equal(stable.environment, "zergchat-stable-updater");
+    assert.equal(preview.if, "needs.validate.outputs.channel == 'preview'");
+    assert.equal(stable.if, "needs.validate.outputs.channel == 'stable'");
+    assert.deepEqual(preview.needs, ["validate", "signed-smoke"]);
+    assert.deepEqual(stable.needs, ["validate", "signed-smoke"]);
+
+    const previewSign = requireStep(preview, "Sign only the preview updater archive");
+    assert.deepEqual(previewSign.env, {
+      TAURI_SIGNING_PRIVATE_KEY: "${{ secrets.ZERGCHAT_PREVIEW_TAURI_SIGNING_PRIVATE_KEY }}",
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD:
+        "${{ secrets.ZERGCHAT_PREVIEW_TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}",
+    });
+    const stableSign = requireStep(stable, "Sign only the stable updater archive");
+    assert.deepEqual(stableSign.env, {
+      TAURI_SIGNING_PRIVATE_KEY: "${{ secrets.ZERGCHAT_STABLE_TAURI_SIGNING_PRIVATE_KEY }}",
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD:
+        "${{ secrets.ZERGCHAT_STABLE_TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}",
+    });
+    assert.doesNotMatch(JSON.stringify(preview), /ZERGCHAT_STABLE_TAURI/);
+    assert.doesNotMatch(JSON.stringify(stable), /ZERGCHAT_PREVIEW_TAURI/);
+
+    assert.equal(aggregate.environment, undefined);
+    assert.deepEqual(aggregate.needs, [
+      "validate",
+      "sign-updater-preview",
+      "sign-updater-stable",
+    ]);
+    assert.doesNotMatch(JSON.stringify(aggregate), /secrets\.|TAURI_SIGNING_PRIVATE_KEY/);
+    requireStep(aggregate, "Verify the updater signature with the public trust root");
+    requireStep(aggregate, "Collect and verify the immutable release payload");
+  });
+
   it("destroys the source deploy key before materializing source bytes", () => {
     const build = requireJob("build-macos");
     const checkout = requireStep(build, "Check out the exact SHA and matching source tag");
