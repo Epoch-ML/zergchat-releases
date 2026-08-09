@@ -519,7 +519,7 @@ test("every ruleset identity, reference, bypass, and rule is exact", () => {
     name: "Dormant desktop exception",
     enforcement: "evaluate",
     target: "tag",
-    include: ["refs/tags/zergchat-v*"],
+    include: ["refs/tags/zergchat-v1.2.3"],
     exclude: [],
     bypass: [reviewerBypass],
     rules: ["update"],
@@ -528,6 +528,108 @@ test("every ruleset identity, reference, bypass, and rule is exact", () => {
     errorCodes(zergchatScopedSource),
     ["source-ruleset-contract"],
   );
+
+  for (const [label, mutate] of [
+    ["expected name", (ruleset) => {
+      ruleset.name = "Development branch history";
+    }],
+    ["uppercase product name", (ruleset) => { ruleset.name = "ZERGCHAT policy"; }],
+    ["default branch", (ruleset) => { ruleset.include = ["~DEFAULT_BRANCH"]; }],
+    ["development branch", (ruleset) => {
+      ruleset.include = ["refs/heads/development"];
+    }],
+    ["wildcard ref", (ruleset) => {
+      ruleset.include = ["refs/heads/unrelated-service", "refs/tags/*"];
+    }],
+    ["status context", (ruleset) => {
+      ruleset.rules = [
+        "required_status_checks:strict:on-create:Protected-base ZergChat release policy:15368",
+      ];
+    }],
+    ["unsupported target", (ruleset) => { ruleset.target = "repository"; }],
+    ["empty scope", (ruleset) => { ruleset.include = []; }],
+  ]) {
+    const state = idealState();
+    const ruleset = {
+      name: "Unrelated service policy",
+      enforcement: "evaluate",
+      target: "branch",
+      include: ["refs/heads/unrelated-service"],
+      exclude: [],
+      bypass: [],
+      rules: ["deletion"],
+    };
+    mutate(ruleset);
+    state.source.rulesets.push(ruleset);
+    assert.deepEqual(
+      errorCodes(state),
+      ["source-ruleset-contract"],
+      label,
+    );
+  }
+
+  const unrelatedSourceTag = idealState();
+  unrelatedSourceTag.source.rulesets.push({
+    name: "Unrelated service tag history",
+    enforcement: "evaluate",
+    target: "tag",
+    include: ["refs/tags/unrelated-service-v1"],
+    exclude: [],
+    bypass: [],
+    rules: ["deletion", "non_fast_forward"],
+  });
+  assert.equal(
+    errorCodes(unrelatedSourceTag).includes("source-ruleset-contract"),
+    false,
+  );
+
+  const replacement = idealState();
+  replacement.source.rulesets[0] = {
+    name: "Dormant ZergChat replacement",
+    enforcement: "evaluate",
+    target: "branch",
+    include: ["refs/heads/unrelated-service"],
+    exclude: [],
+    bypass: [],
+    rules: ["deletion"],
+  };
+  assert.deepEqual(
+    errorCodes(replacement),
+    ["source-ruleset-contract"],
+  );
+
+  const unrelatedShape = {
+    name: "Unrelated service policy",
+    enforcement: "evaluate",
+    target: "branch",
+    include: ["refs/heads/unrelated-service"],
+    exclude: [],
+    bypass: [],
+    rules: ["deletion"],
+  };
+  for (const [label, value] of [
+    ["null", null],
+    ["array", []],
+    ["name", { ...unrelatedShape, name: 7 }],
+    ["enforcement", { ...unrelatedShape, enforcement: false }],
+    ["target", { ...unrelatedShape, target: null }],
+    ["include", { ...unrelatedShape, include: "branch" }],
+    ["exclude", { ...unrelatedShape, exclude: "none" }],
+    ["bypass", { ...unrelatedShape, bypass: "none" }],
+    ["rules", { ...unrelatedShape, rules: "deletion" }],
+    ["include member", { ...unrelatedShape, include: [7] }],
+    ["exclude member", { ...unrelatedShape, exclude: [7] }],
+    ["bypass member", { ...unrelatedShape, bypass: [7] }],
+    ["rule member", { ...unrelatedShape, rules: [7] }],
+  ]) {
+    const state = idealState();
+    state.source.rulesets.push(value);
+    assert.deepEqual(
+      errorCodes(state),
+      ["source-ruleset-contract"],
+      label,
+    );
+  }
 });
 
 test("repository-scoped release credentials are rejected independently", () => {

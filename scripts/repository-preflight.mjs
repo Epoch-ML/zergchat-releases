@@ -388,11 +388,45 @@ function findWorkflow(workflows, path) {
 
 function rulesetMatches(actual, expected) {
   return actual !== undefined &&
+    actual.enforcement === "active" &&
     actual.target === expected.target &&
     equalStrings(actual.include, expected.include) &&
     equalStrings(actual.exclude, expected.exclude) &&
     equalStrings(actual.bypass, expected.bypass) &&
     equalStrings(actual.rules, expected.rules);
+}
+
+function sourceRulesetIsRelevant(ruleset, expectedNames) {
+  if (
+    ruleset === null ||
+    typeof ruleset !== "object" ||
+    Array.isArray(ruleset) ||
+    typeof ruleset.name !== "string" ||
+    typeof ruleset.enforcement !== "string" ||
+    typeof ruleset.target !== "string" ||
+    !Array.isArray(ruleset.include) ||
+    !Array.isArray(ruleset.exclude) ||
+    !Array.isArray(ruleset.bypass) ||
+    !Array.isArray(ruleset.rules) ||
+    [...ruleset.include, ...ruleset.exclude, ...ruleset.bypass, ...ruleset.rules]
+      .some((value) => typeof value !== "string")
+  ) {
+    return true;
+  }
+  if (expectedNames.has(ruleset.name)) return true;
+  if (ruleset.target !== "branch" && ruleset.target !== "tag") return true;
+  if (ruleset.include.length === 0) return true;
+
+  const sourceWideRefs = new Set([
+    "~ALL",
+    "~DEFAULT_BRANCH",
+    "refs/heads/development",
+  ]);
+  const scopedText = [ruleset.name, ...ruleset.include, ...ruleset.rules];
+  return scopedText.some((value) => value.toLowerCase().includes("zergchat")) ||
+    ruleset.include.some((value) =>
+      sourceWideRefs.has(value) || /[*?\[]/.test(value)
+    );
 }
 
 function environmentMatches(actual, expected) {
@@ -744,15 +778,18 @@ export function auditRepositoryState(state, { phase } = {}) {
   const expectedSourceRulesetNames = new Set(
     EXPECTED_SOURCE_RULESETS.map(({ name }) => name),
   );
-  const scopedSourceRulesets = sourceRulesets.filter(({ name }) =>
-    expectedSourceRulesetNames.has(name)
+  const scopedSourceRulesets = sourceRulesets.filter((ruleset) =>
+    sourceRulesetIsRelevant(ruleset, expectedSourceRulesetNames)
   );
   const sourceRulesetNamesAreUnique = EXPECTED_SOURCE_RULESETS.every(
     ({ name }) => scopedSourceRulesets.filter(
-      (ruleset) => ruleset.name === name,
+      (ruleset) => ruleset?.name === name,
     ).length === 1,
   );
-  if (!sourceRulesetNamesAreUnique) {
+  if (
+    !sourceRulesetNamesAreUnique ||
+    scopedSourceRulesets.length !== EXPECTED_SOURCE_RULESETS.length
+  ) {
     errors.push(diagnostic(
       "source-ruleset-contract",
       "the source repository must contain one of each reviewed ZergChat ruleset",
@@ -760,7 +797,7 @@ export function auditRepositoryState(state, { phase } = {}) {
   }
   for (const expected of EXPECTED_SOURCE_RULESETS) {
     const matches = scopedSourceRulesets.filter(
-      (ruleset) => ruleset.name === expected.name,
+      (ruleset) => ruleset?.name === expected.name,
     );
     if (matches.length === 1 && !rulesetMatches(matches[0], expected)) {
       errors.push(diagnostic(
@@ -895,6 +932,7 @@ function normalizeRuleset(ruleset) {
     .flatMap(normalizeRule);
   return {
     name: requireString(ruleset.name, "ruleset name"),
+    enforcement: requireString(ruleset.enforcement, "ruleset enforcement"),
     target: requireString(ruleset.target, "ruleset target"),
     include: sortedStrings(include),
     exclude: sortedStrings(exclude),
@@ -1240,7 +1278,7 @@ async function collectRulesets(request, repository, response) {
       repository,
       path: `rulesets/${summary.id}`,
     });
-    if (full.enforcement === "active") rulesets.push(normalizeRuleset(full));
+    rulesets.push(normalizeRuleset(full));
   }
   return rulesets;
 }
