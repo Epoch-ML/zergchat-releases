@@ -59,6 +59,7 @@ describe("ZergChat source-build release contract", () => {
       "cargo test --locked --manifest-path src-tauri/Cargo.toml",
       "cargo check --locked --lib --manifest-path src-tauri/Cargo.toml",
       "cargo clippy --locked --lib --manifest-path src-tauri/Cargo.toml -- -D warnings",
+      "cargo fmt --all --manifest-path src-tauri/Cargo.toml -- --check",
     ]) {
       assert.ok(sourceGate.run.includes(command), `source gate must execute ${command}`);
     }
