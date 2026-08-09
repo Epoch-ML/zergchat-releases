@@ -14,6 +14,16 @@ const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const MAX_RELEASE_DATA_ENTRIES = 4_096;
 const MAX_RELEASE_DATA_FILE_BYTES = 1_048_576;
 const MAX_RELEASE_DATA_TOTAL_BYTES = 67_108_864;
+const MAX_GITHUB_PAGES = 100;
+const MAX_GITHUB_PAGE_RECORDS = 100;
+const MAX_GITHUB_RECORDS = MAX_GITHUB_PAGES * MAX_GITHUB_PAGE_RECORDS;
+const PAGINATION_KEYS = new Set([
+  "array",
+  "branch_policies",
+  "environments",
+  "secrets",
+  "workflows",
+]);
 const STABLE_METADATA_PATH_PATTERN =
   /^stable\/releases\/(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.json$/;
 const PREVIEW_METADATA_PATH_PATTERN =
@@ -695,11 +705,72 @@ function normalizeRuleset(ruleset) {
   };
 }
 
+function repositoryResourceUrl(repository, path) {
+  const resource = path === "" ? repository : `${repository}/${path}`;
+  return new URL(`https://api.github.com/repos/${resource}`);
+}
+
+function validatedPaginationUrl(rawUrl, resourceUrl) {
+  let url;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    throw new RepositoryPreflightError("GitHub API returned a malformed pagination Link");
+  }
+  const parameterNames = [...url.searchParams.keys()];
+  const page = url.searchParams.getAll("page");
+  const perPage = url.searchParams.getAll("per_page");
+  if (
+    url.origin !== "https://api.github.com" ||
+    url.username !== "" ||
+    url.password !== "" ||
+    url.hash !== "" ||
+    url.pathname !== resourceUrl.pathname ||
+    parameterNames.some((name) => name !== "page" && name !== "per_page") ||
+    new Set(parameterNames).size !== parameterNames.length ||
+    page.length !== 1 ||
+    !/^[1-9]\d*$/.test(page[0]) ||
+    Number(page[0]) > MAX_GITHUB_PAGES ||
+    perPage.length !== 1 ||
+    perPage[0] !== String(MAX_GITHUB_PAGE_RECORDS)
+  ) {
+    throw new RepositoryPreflightError("GitHub API returned an untrusted pagination URL");
+  }
+  return url;
+}
+
+function nextPaginationUrl(response, resourceUrl) {
+  if (response.headers === undefined ||
+      typeof response.headers.get !== "function") {
+    throw new RepositoryPreflightError("GitHub API pagination headers are unavailable");
+  }
+  const header = response.headers.get("link");
+  if (header === null || header === "") return null;
+  const relations = new Map();
+  for (const rawPart of header.split(",")) {
+    const match = /^\s*<([^<>]+)>;\s*rel="(first|last|next|prev)"\s*$/.exec(rawPart);
+    if (match === null || relations.has(match[2])) {
+      throw new RepositoryPreflightError("GitHub API returned a malformed pagination Link");
+    }
+    relations.set(match[2], validatedPaginationUrl(match[1], resourceUrl));
+  }
+  return relations.get("next") ?? null;
+}
+
+async function readGitHubJson(response, description) {
+  try {
+    return await response.json();
+  } catch {
+    throw new RepositoryPreflightError(`${description} returned malformed JSON`);
+  }
+}
+
 export async function requestGitHub({
   repository,
   path,
   apiVersion = "2022-11-28",
   allowNotFound = false,
+  paginationKey,
 }, {
   token = process.env.GH_TOKEN,
   fetchImpl = fetch,
@@ -710,23 +781,87 @@ export async function requestGitHub({
   if (typeof fetchImpl !== "function") {
     throw new RepositoryPreflightError("fetchImpl must be a function");
   }
-  const response = await fetchImpl(
-    `https://api.github.com/repos/${repository}/${path}`,
-    {
+  if (paginationKey !== undefined && !PAGINATION_KEYS.has(paginationKey)) {
+    throw new RepositoryPreflightError("GitHub API pagination key is invalid");
+  }
+  if (paginationKey !== undefined && allowNotFound) {
+    throw new RepositoryPreflightError(
+      "GitHub API pagination cannot allow a missing resource",
+    );
+  }
+  const resourceUrl = repositoryResourceUrl(repository, path);
+  let requestUrl = new URL(resourceUrl);
+  if (paginationKey !== undefined) {
+    requestUrl.searchParams.set("per_page", String(MAX_GITHUB_PAGE_RECORDS));
+  }
+  const seen = new Set();
+  const records = [];
+  let expectedTotal;
+  let firstDocument;
+  while (true) {
+    if (seen.has(requestUrl.href)) {
+      throw new RepositoryPreflightError("GitHub API pagination loop detected");
+    }
+    if (seen.size >= MAX_GITHUB_PAGES) {
+      throw new RepositoryPreflightError("GitHub API pagination exceeds its page limit");
+    }
+    seen.add(requestUrl.href);
+    const response = await fetchImpl(requestUrl.href, {
       headers: {
         Accept: "application/vnd.github+json",
         Authorization: `Bearer ${token}`,
         "X-GitHub-Api-Version": apiVersion,
       },
-    },
-  );
-  if (allowNotFound && response.status === 404) return null;
-  if (!response.ok) {
+    });
+    if (allowNotFound && response.status === 404) return null;
+    if (!response.ok) {
+      throw new RepositoryPreflightError(
+        `GitHub API ${repository}/${path} returned ${response.status}`,
+      );
+    }
+    const description = `GitHub API ${repository}/${path}`;
+    const document = await readGitHubJson(response, description);
+    if (paginationKey === undefined) return document;
+    const pageRecords = paginationKey === "array"
+      ? document
+      : requireObject(document, `${description} page`)[paginationKey];
+    const page = requireArray(pageRecords, `${description} ${paginationKey}`);
+    if (page.length > MAX_GITHUB_PAGE_RECORDS ||
+        records.length + page.length > MAX_GITHUB_RECORDS) {
+      throw new RepositoryPreflightError(
+        `${description} pagination exceeds its record limit`,
+      );
+    }
+    records.push(...page);
+    if (paginationKey !== "array") {
+      const total = document.total_count;
+      if (!Number.isSafeInteger(total) || total < 0 || total > MAX_GITHUB_RECORDS) {
+        throw new RepositoryPreflightError(
+          `${description} pagination total_count is invalid`,
+        );
+      }
+      if (expectedTotal === undefined) {
+        expectedTotal = total;
+        firstDocument = document;
+      } else if (total !== expectedTotal) {
+        throw new RepositoryPreflightError(
+          `${description} pagination total_count changed between pages`,
+        );
+      }
+    }
+    const next = nextPaginationUrl(response, resourceUrl);
+    if (next === null) break;
+    requestUrl = next;
+  }
+  if (paginationKey !== "array" && expectedTotal !== records.length) {
     throw new RepositoryPreflightError(
-      `GitHub API ${repository}/${path} returned ${response.status}`,
+      `GitHub API ${repository}/${path} pagination total_count does not match ` +
+        `${records.length} records`,
     );
   }
-  return response.json();
+  return paginationKey === "array"
+    ? records
+    : { ...firstDocument, total_count: records.length, [paginationKey]: records };
 }
 
 async function collectEnvironments(request, repository, response) {
@@ -783,10 +918,12 @@ async function collectEnvironments(request, repository, response) {
     const secrets = await request({
       repository,
       path: `environments/${encodeURIComponent(record.name)}/secrets`,
+      paginationKey: "secrets",
     });
     const policies = await request({
       repository,
       path: `environments/${encodeURIComponent(record.name)}/deployment-branch-policies`,
+      paginationKey: "branch_policies",
     });
     environments[record.name] = {
       secrets: requireArray(secrets.secrets, `${record.name} secrets`)
@@ -876,10 +1013,12 @@ export async function collectRepositoryState({
   const releaseWorkflows = await request({
     repository: releaseRepository,
     path: "actions/workflows",
+    paginationKey: "workflows",
   });
   const environmentResponse = await request({
     repository: releaseRepository,
     path: "environments",
+    paginationKey: "environments",
   });
   const environments = await collectEnvironments(
     request,
@@ -889,14 +1028,17 @@ export async function collectRepositoryState({
   const repositorySecretsResponse = await request({
     repository: releaseRepository,
     path: "actions/secrets",
+    paginationKey: "secrets",
   });
   const releaseKeys = await request({
     repository: releaseRepository,
     path: "keys",
+    paginationKey: "array",
   });
   const rulesetResponse = await request({
     repository: releaseRepository,
     path: "rulesets",
+    paginationKey: "array",
   });
   const rulesets = await collectRulesets(
     request,
@@ -906,10 +1048,12 @@ export async function collectRepositoryState({
   const sourceWorkflows = await request({
     repository: sourceRepository,
     path: "actions/workflows",
+    paginationKey: "workflows",
   });
   const sourceEnvironmentResponse = await request({
     repository: sourceRepository,
     path: "environments",
+    paginationKey: "environments",
   });
   const sourceEnvironments = await collectEnvironments(
     request,
@@ -919,11 +1063,17 @@ export async function collectRepositoryState({
   const sourceRepositorySecretsResponse = await request({
     repository: sourceRepository,
     path: "actions/secrets",
+    paginationKey: "secrets",
   });
-  const sourceKeys = await request({ repository: sourceRepository, path: "keys" });
+  const sourceKeys = await request({
+    repository: sourceRepository,
+    path: "keys",
+    paginationKey: "array",
+  });
   const sourceRulesetResponse = await request({
     repository: sourceRepository,
     path: "rulesets",
+    paginationKey: "array",
   });
   const sourceRulesets = await collectRulesets(
     request,
