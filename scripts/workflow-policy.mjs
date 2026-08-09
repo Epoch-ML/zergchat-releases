@@ -42,6 +42,10 @@ const canonicalWorkflow = parseWorkflow(readFileSync(
   new URL("../.github/workflows/release.yml", import.meta.url),
   "utf8",
 ));
+const canonicalPolicyWorkflow = parseWorkflow(readFileSync(
+  new URL("../.github/workflows/policy.yml", import.meta.url),
+  "utf8",
+));
 
 function expressionUsesSecretsContext(expression) {
   let inString = false;
@@ -586,8 +590,20 @@ export function auditWorkflowPolicy(source) {
 }
 
 export function auditPolicyWorkflow(source) {
-  parseWorkflow(source);
-  return [];
+  const workflow = parseWorkflow(source);
+  const secretReferences = collectSecretReferences(workflow);
+  if (
+    sameValue(workflow, canonicalPolicyWorkflow) &&
+    secretReferences.length === 0
+  ) {
+    return [];
+  }
+  return [{
+    code: "policy-ci-contract",
+    job: "policy",
+    step: null,
+    message: "pull-request CI must execute the exact secret-free public policy gates",
+  }];
 }
 
 async function main() {
