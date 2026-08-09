@@ -257,7 +257,10 @@ test("every secret context form is rejected without prose false positives", () =
     const equivalent = mutateWorkflow((workflow) => {
       workflow.jobs.validate.steps[0].name = value;
     });
-    assert.deepEqual(auditWorkflowPolicy(equivalent), [], value);
+    const codes = diagnosticCodes(equivalent);
+    assert.equal(codes.includes("secret-expression-boundary"), false, value);
+    assert.equal(codes.includes("secret-outside-step-env"), false, value);
+    assert.equal(codes.includes("credential-allowlist"), false, value);
   }
 });
 

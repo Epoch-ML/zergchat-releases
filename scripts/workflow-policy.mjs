@@ -130,6 +130,16 @@ function sameValue(left, right) {
   return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
 }
 
+function workflowMetadata(workflow) {
+  const { jobs: _jobs, ...metadata } = workflow;
+  return metadata;
+}
+
+function jobMetadata(job) {
+  const { needs, steps: _steps, ...metadata } = job;
+  return { ...metadata, needs: normalizedNeeds(needs) };
+}
+
 function addDiagnostic(diagnostics, code, job, step, message) {
   diagnostics.push({ code, job, step, message });
 }
@@ -273,6 +283,15 @@ function auditJobShape(diagnostics, jobName, job, expected) {
       "release jobs may not call reusable workflows or forward secrets",
     );
   }
+  if (!sameValue(jobMetadata(job), jobMetadata(expected))) {
+    addDiagnostic(
+      diagnostics,
+      "job-contract",
+      jobName,
+      null,
+      "job execution metadata differs from the protected contract",
+    );
+  }
   if (
     job["runs-on"] !== expected["runs-on"] ||
     !sameValue(job.permissions, expected.permissions) ||
@@ -315,36 +334,17 @@ function auditJobShape(diagnostics, jobName, job, expected) {
     if (step === undefined || expectedStep === undefined) continue;
     requireMapping(step, `${jobName} step ${index + 1}`);
     requireMapping(expectedStep, `${jobName} expected step ${index + 1}`);
-    if (typeof step.uses === "string" || typeof expectedStep.uses === "string") {
-      if (!sameValue(step.uses, expectedStep.uses) ||
-          !sameValue(step.with, expectedStep.with)) {
-        addDiagnostic(
-          diagnostics,
-          "action-contract",
-          jobName,
-          stepIdentity(step),
-          "action identity or inputs differ from the protected contract",
-        );
-      }
-      continue;
-    }
-    const structuralKeys = ["name", "id", "if", "shell", "working-directory"];
-    if (structuralKeys.some((key) => !sameValue(step[key], expectedStep[key]))) {
+    if (!sameValue(step, expectedStep)) {
+      const actionStep = typeof step.uses === "string" ||
+        typeof expectedStep.uses === "string";
       addDiagnostic(
         diagnostics,
-        "job-contract",
+        actionStep ? "action-contract" : "job-contract",
         jobName,
         stepIdentity(step),
-        "run-step identity or execution boundary differs",
-      );
-    }
-    if (!sameValue(step.run, expectedStep.run)) {
-      addDiagnostic(
-        diagnostics,
-        "job-contract",
-        jobName,
-        stepIdentity(step),
-        "run-step program differs from the protected-base version",
+        actionStep
+          ? "action step differs from the protected-base version"
+          : "run step differs from the protected-base version",
       );
     }
   }
@@ -356,6 +356,16 @@ export function auditWorkflowPolicy(source) {
   const expectedJobs = requireMapping(canonicalWorkflow.jobs, "canonical jobs");
   const diagnostics = [];
   const occurrences = [];
+
+  if (!sameValue(workflowMetadata(workflow), workflowMetadata(canonicalWorkflow))) {
+    addDiagnostic(
+      diagnostics,
+      "workflow-contract",
+      "workflow",
+      null,
+      "workflow execution metadata differs from the protected-base version",
+    );
+  }
 
   const triggers = workflow.on !== null && typeof workflow.on === "object" &&
       !Array.isArray(workflow.on)
