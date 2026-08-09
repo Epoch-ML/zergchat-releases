@@ -111,7 +111,7 @@ describe("Zergchat release workflow contract", () => {
     const jobEnvironment = buildJob.slice(0, buildJob.indexOf("\n    steps:"));
     const sourceGate = buildJob.slice(
       buildJob.indexOf("Test and audit the exact source"),
-      buildJob.indexOf("Write and verify the v2 release configuration"),
+      buildJob.indexOf("Write and verify the ZergChat release configuration"),
     );
     const releaseVariables = [
       "ZERGCHAT_DESKTOP_VERSION",
@@ -123,6 +123,9 @@ describe("Zergchat release workflow contract", () => {
       "ZERGCHAT_UPDATE_CHANNEL",
       "ZERGCHAT_VERSION",
       "VITE_ZERGCHAT_UPDATER_ENABLED",
+      "ZERGCHAT_NATIVE_CHANNEL",
+      "ZERGCHAT_NATIVE_VERSION",
+      "NUXT_PUBLIC_API_BASE_URL",
     ];
 
     for (const name of releaseVariables) {
@@ -140,13 +143,13 @@ describe("Zergchat release workflow contract", () => {
     );
 
     const configStep = buildJob.slice(
-      buildJob.indexOf("Write and verify the v2 release configuration"),
+      buildJob.indexOf("Write and verify the ZergChat release configuration"),
       buildJob.indexOf("Build the unsigned app without release signing credentials"),
     );
     for (const binding of [
-      "ZERGCHAT_DESKTOP_VERSION: ${{ needs.validate.outputs.version }}",
-      "ZERGCHAT_UPDATE_BASE_URL: https://epoch-ml.github.io/zergchat-releases",
-      "ZERGCHAT_UPDATE_CHANNEL: ${{ needs.validate.outputs.channel }}",
+      "NUXT_PUBLIC_API_BASE_URL: https://zergchat.com",
+      "ZERGCHAT_NATIVE_CHANNEL: ${{ needs.validate.outputs.channel }}",
+      "ZERGCHAT_NATIVE_VERSION: ${{ needs.validate.outputs.version }}",
     ]) {
       assert.ok(configStep.includes(binding));
     }
@@ -155,15 +158,7 @@ describe("Zergchat release workflow contract", () => {
       buildJob.indexOf("Build the unsigned app without release signing credentials"),
       buildJob.indexOf("Package a bounded unsigned source stage"),
     );
-    assert.ok(
-      applicationBuildStep.includes('VITE_ZERGCHAT_UPDATER_ENABLED: "true"'),
-    );
-    assert.ok(
-      applicationBuildStep.includes(
-        "ZERGCHAT_VERSION: ${{ needs.validate.outputs.version }}",
-      ),
-      "the Nuxt build must display the validated native release version",
-    );
+    assert.doesNotMatch(applicationBuildStep, /UPDATER_ENABLED|TAURI_UPDATER_PUBKEY/);
 
     const packageStep = buildJob.slice(
       buildJob.indexOf("Package a bounded unsigned source stage"),
@@ -588,7 +583,7 @@ describe("Zergchat release workflow contract", () => {
     assert.ok(signJob < signingSecrets);
     const signerJob = workflow.slice(signJob, workflow.indexOf("\n  publish:"));
     assert.doesNotMatch(signerJob, /SOURCE_DEPLOY_KEY/);
-    assert.doesNotMatch(signerJob, /source\/zergchat/);
+    assert.doesNotMatch(signerJob, /source\/zapps\/zergchat/);
     assert.match(signerJob, /npm exec --offline -- tauri signer sign/);
     assert.match(workflow, /createUpdaterArtifacts, false/);
   });
@@ -612,10 +607,10 @@ describe("Zergchat release workflow contract", () => {
     assert.match(appleJob, /ZERGCHAT_APPLE_CERTIFICATE/);
     assert.match(appleJob, /codesign/);
     assert.match(appleJob, /notarytool/);
-    assert.doesNotMatch(appleJob, /ZERG_SOURCE_DEPLOY_KEY|source\/zergchat|git init source/);
+    assert.doesNotMatch(appleJob, /ZERG_SOURCE_DEPLOY_KEY|source\/zapps\/zergchat|git init source/);
     assert.match(updaterJob, /ZERGCHAT_PREVIEW_TAURI_SIGNING_PRIVATE_KEY/);
     assert.match(updaterJob, /ZERGCHAT_STABLE_TAURI_SIGNING_PRIVATE_KEY/);
-    assert.doesNotMatch(updaterJob, /ZERG_SOURCE_DEPLOY_KEY|ZERGCHAT_APPLE_|source\/zergchat/);
+    assert.doesNotMatch(updaterJob, /ZERG_SOURCE_DEPLOY_KEY|ZERGCHAT_APPLE_|source\/zapps\/zergchat/);
   });
 
   it("binds every channel to a distinct embedded and signing trust root", () => {
@@ -634,7 +629,7 @@ describe("Zergchat release workflow contract", () => {
     );
     const hostileStage = workflow.slice(extract, appleSecrets);
     assert.ok(extract > 0 && appleSecrets > extract);
-    assert.match(workflow, /aarch64\.source\.app\.tar\.gz/);
+    assert.match(workflow, /universal\.source\.app\.tar\.gz/);
     assert.match(workflow, /ZERGCHAT_STAGE_MAX_ENTRY_COUNT/);
     assert.match(workflow, /ZERGCHAT_STAGE_MAX_UNCOMPRESSED_BYTES/);
     assert.doesNotMatch(hostileStage, /Contents\/MacOS\/Zergchat(?:\s|"|'|$)/);

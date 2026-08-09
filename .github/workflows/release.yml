@@ -28,6 +28,7 @@ jobs:
       source_ref: ${{ steps.request.outputs.source_ref }}
       source_repository: ${{ steps.request.outputs.source_repository }}
       source_sha: ${{ steps.request.outputs.source_sha }}
+      updater_public_key_sha256: ${{ steps.request.outputs.updater_public_key_sha256 }}
       version: ${{ steps.request.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -115,6 +116,34 @@ jobs:
         name: Validate request schema and provenance
         run: node scripts/release-request.mjs "${{ steps.select.outputs.request_path }}"
 
+      - name: Bind the request to the channel updater root
+        env:
+          RELEASE_CHANNEL: ${{ steps.request.outputs.channel }}
+          REQUEST_UPDATER_PUBLIC_KEY_SHA256: ${{ steps.request.outputs.updater_public_key_sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$RELEASE_CHANNEL" == "stable" ]]; then
+            key_path="keys/zergchat-stable-updater.pubkey"
+          else
+            key_path="keys/zergchat-preview-updater.pubkey"
+          fi
+          if [[ ! -f "$key_path" || -L "$key_path" ]]; then
+            echo "::error::The selected updater root must be a regular non-symlink file."
+            exit 1
+          fi
+          KEY_PATH="$key_path" node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import { createHash } from "node:crypto";
+          import { readFile } from "node:fs/promises";
+
+          const encoded = (await readFile(process.env.KEY_PATH, "utf8")).trim();
+          assert.match(encoded, /^[A-Za-z0-9+/]+={0,2}$/, "updater root must be canonical base64");
+          assert.equal(Buffer.from(encoded, "base64").toString("base64"), encoded, "updater root must use canonical base64");
+          const digest = createHash("sha256").update(encoded).digest("hex");
+          assert.equal(digest, process.env.REQUEST_UPDATER_PUBLIC_KEY_SHA256, "request updater root digest mismatch");
+          NODE
+
       - name: Require the pre-existing public release tag at the request commit
         env:
           RELEASE_TAG: ${{ steps.request.outputs.release_tag }}
@@ -140,8 +169,8 @@ jobs:
           fi
 
   build-macos:
-    name: Verify source, then build Apple Silicon macOS
-    needs: validate
+    name: Verify source, then build universal macOS
+    needs: [validate]
     runs-on: macos-15
     environment:
       name: ${{ needs.validate.outputs.channel == 'stable' && 'zergchat-stable-build' || 'zergchat-preview-build' }}
@@ -194,7 +223,7 @@ jobs:
           fi
           GIT_LFS_SKIP_SMUDGE=1 git -C source checkout --detach "$SOURCE_SHA"
           test "$(git -C source rev-parse HEAD)" = "$SOURCE_SHA"
-          test -f source/zergchat/package-lock.json
+          test -f source/zapps/zergchat/package-lock.json
 
       - name: Delete ephemeral source deploy key
         if: always()
@@ -207,16 +236,16 @@ jobs:
           set -euo pipefail
           cmp --silent \
             release-repository/keys/zergchat-preview-updater.pubkey \
-            source/zergchat/src-tauri/updater-preview.pubkey
+            source/zapps/zergchat/src-tauri/updater-preview.pubkey
           cmp --silent \
             release-repository/keys/zergchat-stable-updater.pubkey \
-            source/zergchat/src-tauri/updater-stable.pubkey
+            source/zapps/zergchat/src-tauri/updater-stable.pubkey
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: "22.23.2"
           cache: npm
-          cache-dependency-path: source/zergchat/package-lock.json
+          cache-dependency-path: source/zapps/zergchat/package-lock.json
 
       - name: Verify the deterministic source commit timestamp
         env:
@@ -239,13 +268,13 @@ jobs:
           rustup toolchain install 1.88.0 \
             --profile minimal \
             --component clippy,rustfmt \
-            --target aarch64-apple-darwin
+            --target aarch64-apple-darwin,x86_64-apple-darwin
           rustup default 1.88.0
 
       - name: Install locked dependencies and security tooling
         run: |
           set -euo pipefail
-          npm ci --prefix source/zergchat
+          npm ci --prefix source/zapps/zergchat
           npm ci --ignore-scripts --prefix release-repository
           (
             cd release-repository
@@ -255,28 +284,36 @@ jobs:
           cargo install cargo-audit --version 0.22.2 --locked
 
       - name: Test and audit the exact source
-        working-directory: source/zergchat
+        working-directory: source/zapps/zergchat
         run: |
           set -euo pipefail
           # Release gate: fail on moderate, high, or critical production advisories.
           npm audit --omit=dev --audit-level=moderate
           cargo audit --file src-tauri/Cargo.lock
-          npm test
+          npm run test:unit
+          npm run test:e2e -- \
+            tests/e2e/desktop-release-boundary.unit.spec.ts \
+            tests/e2e/desktop-updater.spec.ts \
+            tests/e2e/release-csp.unit.spec.ts
+          npm run typecheck
           npm run build
+          npm run generate
+          npm run theme:check
           cargo test --locked --manifest-path src-tauri/Cargo.toml
-          cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
-          cargo clippy --locked --all-targets --manifest-path src-tauri/Cargo.toml -- -D warnings
+          cargo check --locked --lib --manifest-path src-tauri/Cargo.toml
+          cargo clippy --locked --lib --manifest-path src-tauri/Cargo.toml -- -D warnings
+          rustfmt --edition 2021 --check src-tauri/src/lib.rs
 
-      - name: Write and verify the v2 release configuration
+      - name: Write and verify the ZergChat release configuration
         env:
-          ZERGCHAT_DESKTOP_VERSION: ${{ needs.validate.outputs.version }}
-          ZERGCHAT_UPDATE_BASE_URL: https://epoch-ml.github.io/zergchat-releases
-          ZERGCHAT_UPDATE_CHANNEL: ${{ needs.validate.outputs.channel }}
-        working-directory: source/zergchat
+          NUXT_PUBLIC_API_BASE_URL: https://zergchat.com
+          ZERGCHAT_NATIVE_CHANNEL: ${{ needs.validate.outputs.channel }}
+          ZERGCHAT_NATIVE_VERSION: ${{ needs.validate.outputs.version }}
+        working-directory: source/zapps/zergchat
         run: |
           set -euo pipefail
-          npm run release:config
-          if [[ "$ZERGCHAT_UPDATE_CHANNEL" == "stable" ]]; then
+          npm run native:release-config
+          if [[ "$ZERGCHAT_NATIVE_CHANNEL" == "stable" ]]; then
             key_name="updater-stable.pubkey"
             trust_name="zergchat-stable-updater.pubkey"
           else
@@ -293,24 +330,23 @@ jobs:
           const committedKey = await readFile("src-tauri/" + process.env.RELEASE_COMMITTED_KEY);
           const trustedKey = await readFile(process.env.RELEASE_TRUST_ROOT);
           assert.equal(Buffer.compare(committedKey, trustedKey), 0);
-          assert.equal(config.version, process.env.ZERGCHAT_DESKTOP_VERSION);
+          assert.equal(config.productName, "Zergchat");
+          assert.equal(config.identifier, "com.zergai.zergchat");
+          assert.equal(config.version, process.env.ZERGCHAT_NATIVE_VERSION);
           assert.deepEqual(config.plugins.updater.endpoints, [
-            "https://epoch-ml.github.io/zergchat-releases/" + process.env.ZERGCHAT_UPDATE_CHANNEL + "/latest.json",
+            "https://epoch-ml.github.io/zergchat-releases/" + process.env.ZERGCHAT_NATIVE_CHANNEL + "/latest.json",
           ]);
           assert.equal(config.plugins.updater.pubkey, committedKey.toString("utf8").trim());
           assert.equal(config.bundle.createUpdaterArtifacts, false);
           NODE
 
       - name: Build the unsigned app without release signing credentials
-        env:
-          VITE_ZERGCHAT_UPDATER_ENABLED: "true"
-          ZERGCHAT_VERSION: ${{ needs.validate.outputs.version }}
-        working-directory: source/zergchat
+        working-directory: source/zapps/zergchat
         run: |
           set -euo pipefail
           npm run tauri:build -- \
             --ci \
-            --target aarch64-apple-darwin \
+            --target universal-apple-darwin \
             --bundles app \
             --no-sign \
             --skip-stapling \
@@ -322,11 +358,11 @@ jobs:
           ZERGCHAT_RELEASE_TAG: ${{ needs.validate.outputs.release_tag }}
           ZERGCHAT_SOURCE_SHA: ${{ needs.validate.outputs.source_sha }}
           ZERGCHAT_UPDATE_CHANNEL: ${{ needs.validate.outputs.channel }}
-        working-directory: source/zergchat
+        working-directory: source/zapps/zergchat
         shell: bash
         run: |
           set -euo pipefail
-          bundle_root="src-tauri/target/aarch64-apple-darwin/release/bundle"
+          bundle_root="src-tauri/target/universal-apple-darwin/release/bundle"
           apps=()
           while IFS= read -r path; do
             apps+=("$path")
@@ -338,7 +374,7 @@ jobs:
 
           source_stage="dist/source-stage"
           mkdir -p "$source_stage"
-          archive="$source_stage/ZERGCHAT_${ZERGCHAT_DESKTOP_VERSION}_aarch64.source.app.tar.gz"
+          archive="$source_stage/Zergchat_${ZERGCHAT_DESKTOP_VERSION}_universal.source.app.tar.gz"
           node "$GITHUB_WORKSPACE/release-repository/scripts/package-macos.mjs" \
             "${apps[0]}" \
             "$archive"
@@ -359,7 +395,7 @@ jobs:
             channel: process.env.ZERGCHAT_UPDATE_CHANNEL,
             release_tag: process.env.ZERGCHAT_RELEASE_TAG,
             source_sha: process.env.ZERGCHAT_SOURCE_SHA,
-            platform: "darwin-aarch64",
+            platform: "darwin-universal",
             apple_signature: "none",
           };
           await writeFile(
@@ -374,7 +410,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: zergchat-v2-unsigned-source-stage
-          path: source/zergchat/dist/source-stage/*
+          path: source/zapps/zergchat/dist/source-stage/*
           if-no-files-found: error
           retention-days: 1
           compression-level: 0
