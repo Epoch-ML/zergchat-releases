@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 
-import { readFile } from "node:fs/promises";
+import { readFile, readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
+import { promisify } from "node:util";
 
 import { parseDocument } from "yaml";
+
+const readFileAsync = promisify(readFile);
 
 export class WorkflowPolicyError extends Error {
   constructor(message) {
@@ -12,7 +15,14 @@ export class WorkflowPolicyError extends Error {
   }
 }
 
-export function auditWorkflowPolicy(source) {
+function requireMapping(value, description) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new WorkflowPolicyError(`${description} must be a mapping`);
+  }
+  return value;
+}
+
+function parseWorkflow(source) {
   if (typeof source !== "string" || source.trim() === "") {
     throw new WorkflowPolicyError("workflow source must be non-empty text");
   }
@@ -24,14 +34,562 @@ export function auditWorkflowPolicy(source) {
   if (document.errors.length > 0) {
     throw new WorkflowPolicyError("workflow source must be valid YAML");
   }
-  return [];
+  const workflow = document.toJS({ maxAliasCount: 0 });
+  return requireMapping(workflow, "workflow root");
+}
+
+const canonicalWorkflow = parseWorkflow(readFileSync(
+  new URL("../.github/workflows/release.yml", import.meta.url),
+  "utf8",
+));
+
+function expressionUsesSecretsContext(expression) {
+  let inString = false;
+  for (let index = 0; index < expression.length; index += 1) {
+    const character = expression[index];
+    if (character === "'") {
+      if (inString && expression[index + 1] === "'") index += 1;
+      else inString = !inString;
+      continue;
+    }
+    if (inString || !/[A-Za-z_]/.test(character)) continue;
+    let end = index + 1;
+    while (end < expression.length && /[A-Za-z0-9_]/.test(expression[end])) {
+      end += 1;
+    }
+    if (expression.slice(index, end).toLowerCase() === "secrets") return true;
+    index = end - 1;
+  }
+  return false;
+}
+
+function secretReferencesInString(value) {
+  const references = [];
+  let start = value.indexOf("${{");
+  while (start !== -1) {
+    let inString = false;
+    let closed = false;
+    for (let index = start + 3; index < value.length - 1; index += 1) {
+      if (value[index] === "'") {
+        if (inString && value[index + 1] === "'") index += 1;
+        else inString = !inString;
+      } else if (!inString && value[index] === "}" && value[index + 1] === "}") {
+        closed = true;
+        const expression = value.slice(start + 3, index);
+        if (expressionUsesSecretsContext(expression)) {
+          const canonical = expression.trim().match(/^secrets\.([A-Z0-9_]+)$/);
+          references.push({
+            canonical: canonical !== null,
+            name: canonical?.[1] ?? null,
+          });
+        }
+        start = value.indexOf("${{", index + 2);
+        break;
+      }
+    }
+    if (!closed) break;
+  }
+  return references;
+}
+
+function collectSecretReferences(value, references = []) {
+  if (typeof value === "string") {
+    references.push(...secretReferencesInString(value));
+  } else if (Array.isArray(value)) {
+    for (const item of value) collectSecretReferences(item, references);
+  } else if (value !== null && typeof value === "object") {
+    for (const item of Object.values(value)) {
+      collectSecretReferences(item, references);
+    }
+  }
+  return references;
+}
+
+function collectSecretReferencesOutsideStepEnv(step) {
+  const references = [];
+  for (const [key, value] of Object.entries(step)) {
+    if (key !== "env") collectSecretReferences(value, references);
+  }
+  return references;
+}
+
+function normalizedNeeds(value) {
+  if (value === undefined) return [];
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value) && value.every((item) => typeof item === "string")) {
+    return [...value].sort();
+  }
+  throw new WorkflowPolicyError("job needs must be a string or string array");
+}
+
+function sameValue(left, right) {
+  return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
+}
+
+function addDiagnostic(diagnostics, code, job, step, message) {
+  diagnostics.push({ code, job, step, message });
+}
+
+function credentialKindForJob(job) {
+  if (job === "build-macos") return "source";
+  if (job === "apple-sign") return "apple";
+  if (job === "sign-updater-preview" || job === "sign-updater-stable") {
+    return "updater";
+  }
+  if (job === "promote-feed") return "feed";
+  return null;
+}
+
+const CREDENTIAL_BINDINGS = Object.freeze({
+  ZERG_SOURCE_DEPLOY_KEY: Object.freeze({
+    job: "build-macos",
+    step: "Check out the exact SHA and matching source tag",
+    env: "SOURCE_DEPLOY_KEY",
+    kind: "source",
+  }),
+  ZERGCHAT_APPLE_API_ISSUER: Object.freeze({
+    job: "apple-sign",
+    step: "Apply preview ad-hoc or fail-closed stable Apple signing",
+    env: "ZERGCHAT_APPLE_API_ISSUER",
+    kind: "apple",
+  }),
+  ZERGCHAT_APPLE_API_KEY_ID: Object.freeze({
+    job: "apple-sign",
+    step: "Apply preview ad-hoc or fail-closed stable Apple signing",
+    env: "ZERGCHAT_APPLE_API_KEY_ID",
+    kind: "apple",
+  }),
+  ZERGCHAT_APPLE_API_PRIVATE_KEY: Object.freeze({
+    job: "apple-sign",
+    step: "Apply preview ad-hoc or fail-closed stable Apple signing",
+    env: "ZERGCHAT_APPLE_API_PRIVATE_KEY",
+    kind: "apple",
+  }),
+  ZERGCHAT_APPLE_CERTIFICATE: Object.freeze({
+    job: "apple-sign",
+    step: "Apply preview ad-hoc or fail-closed stable Apple signing",
+    env: "ZERGCHAT_APPLE_CERTIFICATE",
+    kind: "apple",
+  }),
+  ZERGCHAT_APPLE_CERTIFICATE_PASSWORD: Object.freeze({
+    job: "apple-sign",
+    step: "Apply preview ad-hoc or fail-closed stable Apple signing",
+    env: "ZERGCHAT_APPLE_CERTIFICATE_PASSWORD",
+    kind: "apple",
+  }),
+  ZERGCHAT_APPLE_SIGNING_IDENTITY: Object.freeze({
+    job: "apple-sign",
+    step: "Apply preview ad-hoc or fail-closed stable Apple signing",
+    env: "ZERGCHAT_APPLE_SIGNING_IDENTITY",
+    kind: "apple",
+  }),
+  ZERGCHAT_PREVIEW_TAURI_SIGNING_PRIVATE_KEY: Object.freeze({
+    job: "sign-updater-preview",
+    step: "Sign only the preview updater archive",
+    env: "TAURI_SIGNING_PRIVATE_KEY",
+    kind: "updater",
+  }),
+  ZERGCHAT_PREVIEW_TAURI_SIGNING_PRIVATE_KEY_PASSWORD: Object.freeze({
+    job: "sign-updater-preview",
+    step: "Sign only the preview updater archive",
+    env: "TAURI_SIGNING_PRIVATE_KEY_PASSWORD",
+    kind: "updater",
+  }),
+  ZERGCHAT_STABLE_TAURI_SIGNING_PRIVATE_KEY: Object.freeze({
+    job: "sign-updater-stable",
+    step: "Sign only the stable updater archive",
+    env: "TAURI_SIGNING_PRIVATE_KEY",
+    kind: "updater",
+  }),
+  ZERGCHAT_STABLE_TAURI_SIGNING_PRIVATE_KEY_PASSWORD: Object.freeze({
+    job: "sign-updater-stable",
+    step: "Sign only the stable updater archive",
+    env: "TAURI_SIGNING_PRIVATE_KEY_PASSWORD",
+    kind: "updater",
+  }),
+  ZERGCHAT_FEED_DEPLOY_KEY: Object.freeze({
+    job: "promote-feed",
+    step: "Push the prepared release-data commit",
+    env: "ZERGCHAT_FEED_DEPLOY_KEY",
+    kind: "feed",
+  }),
+});
+
+function stepIdentity(step) {
+  if (typeof step.name === "string") return step.name;
+  if (typeof step.uses === "string") return `uses ${step.uses}`;
+  return "unnamed step";
+}
+
+function firstCommandIndex(run, pattern) {
+  const match = pattern.exec(run);
+  return match === null ? -1 : match.index;
+}
+
+function auditSourceWindow(diagnostics, job, stepName, run) {
+  const unsetIndex = run.indexOf("unset SOURCE_DEPLOY_KEY GITHUB_META_TOKEN");
+  const removeIndex = run.indexOf('rm -f "$key_path"');
+  const materializeIndex = firstCommandIndex(
+    run,
+    /(?:^|\n)(?:GIT_LFS_SKIP_SMUDGE=1\s+)?git\s+-C\s+source\s+(?:checkout|archive)\b|(?:^|\n)(?:npm|cargo|tar)\b/m,
+  );
+  if (
+    !run.includes("trap 'rm -f \"$key_path\"' EXIT") ||
+    unsetIndex === -1 || removeIndex === -1 ||
+    (materializeIndex !== -1 &&
+      (materializeIndex < unsetIndex || materializeIndex < removeIndex))
+  ) {
+    addDiagnostic(
+      diagnostics,
+      "source-credential-window",
+      job,
+      stepName,
+      "source credentials must be destroyed before source materialization",
+    );
+  }
+}
+
+function auditAppleWindow(diagnostics, job, stepName, run) {
+  if (
+    run.includes("scripts/package-macos.mjs") ||
+    run.includes("scripts/collect-release.mjs") ||
+    /(?:^|\n)\s*(?:node|npm|cargo)\b/m.test(run)
+  ) {
+    addDiagnostic(
+      diagnostics,
+      "apple-secret-window",
+      job,
+      stepName,
+      "Apple credentials may coexist only with signing and notarization tools",
+    );
+  }
+}
+
+function auditUpdaterWindow(diagnostics, job, stepName, run) {
+  const unsetIndex = run.indexOf(
+    "unset TAURI_SIGNING_PRIVATE_KEY TAURI_SIGNING_PRIVATE_KEY_PASSWORD",
+  );
+  const signIndex = run.indexOf("npm exec --offline -- tauri signer sign");
+  const extraWorkIndex = firstCommandIndex(
+    run,
+    /(?:^|\n)\s*(?:curl|wget|tar|sha256sum|minisign)\b|scripts\/(?:collect|verify|release)/m,
+  );
+  if (
+    signIndex === -1 || unsetIndex < signIndex ||
+    (extraWorkIndex !== -1 && extraWorkIndex < unsetIndex)
+  ) {
+    addDiagnostic(
+      diagnostics,
+      "updater-secret-window",
+      job,
+      stepName,
+      "updater keys may coexist only with one offline signing operation",
+    );
+  }
+}
+
+function auditFeedWindow(diagnostics, job, stepName, run) {
+  if (
+    !run.includes("HEAD:refs/heads/release-data") ||
+    run.includes("HEAD:refs/heads/main") ||
+    !run.includes("unset ZERGCHAT_FEED_DEPLOY_KEY") ||
+    !run.includes("trap 'rm -f \"$key_path\"' EXIT")
+  ) {
+    addDiagnostic(
+      diagnostics,
+      "feed-credential-contract",
+      job,
+      stepName,
+      "the feed key may push only the prepared release-data commit",
+    );
+  }
+}
+
+function auditJobShape(diagnostics, jobName, job, expected) {
+  if (job.uses !== undefined || job.secrets !== undefined) {
+    addDiagnostic(
+      diagnostics,
+      "job-contract",
+      jobName,
+      null,
+      "release jobs may not call reusable workflows or forward secrets",
+    );
+  }
+  if (
+    job["runs-on"] !== expected["runs-on"] ||
+    !sameValue(job.permissions, expected.permissions) ||
+    !sameValue(job.environment, expected.environment) ||
+    !sameValue(normalizedNeeds(job.needs), normalizedNeeds(expected.needs))
+  ) {
+    addDiagnostic(
+      diagnostics,
+      "job-contract",
+      jobName,
+      null,
+      "runner, permissions, environment, or dependencies differ",
+    );
+  }
+  if (!sameValue(job.environment, expected.environment)) {
+    addDiagnostic(
+      diagnostics,
+      "environment-boundary",
+      jobName,
+      null,
+      "job environment differs from the protected contract",
+    );
+  }
+  if (!Array.isArray(job.steps) || !Array.isArray(expected.steps)) {
+    throw new WorkflowPolicyError(`${jobName} job steps must be an array`);
+  }
+  if (job.steps.length !== expected.steps.length) {
+    addDiagnostic(
+      diagnostics,
+      "job-contract",
+      jobName,
+      null,
+      "job step count differs from the protected contract",
+    );
+  }
+  const maximum = Math.max(job.steps.length, expected.steps.length);
+  for (let index = 0; index < maximum; index += 1) {
+    const step = job.steps[index];
+    const expectedStep = expected.steps[index];
+    if (step === undefined || expectedStep === undefined) continue;
+    requireMapping(step, `${jobName} step ${index + 1}`);
+    requireMapping(expectedStep, `${jobName} expected step ${index + 1}`);
+    if (typeof step.uses === "string" || typeof expectedStep.uses === "string") {
+      if (!sameValue(step.uses, expectedStep.uses) ||
+          !sameValue(step.with, expectedStep.with)) {
+        addDiagnostic(
+          diagnostics,
+          "action-contract",
+          jobName,
+          stepIdentity(step),
+          "action identity or inputs differ from the protected contract",
+        );
+      }
+      continue;
+    }
+    const structuralKeys = ["name", "id", "if", "shell", "working-directory"];
+    if (structuralKeys.some((key) => !sameValue(step[key], expectedStep[key]))) {
+      addDiagnostic(
+        diagnostics,
+        "job-contract",
+        jobName,
+        stepIdentity(step),
+        "run-step identity or execution boundary differs",
+      );
+    }
+    if (!sameValue(step.run, expectedStep.run)) {
+      addDiagnostic(
+        diagnostics,
+        "job-contract",
+        jobName,
+        stepIdentity(step),
+        "run-step program differs from the protected-base version",
+      );
+    }
+  }
+}
+
+export function auditWorkflowPolicy(source) {
+  const workflow = parseWorkflow(source);
+  const jobs = requireMapping(workflow.jobs, "workflow jobs");
+  const expectedJobs = requireMapping(canonicalWorkflow.jobs, "canonical jobs");
+  const diagnostics = [];
+  const occurrences = [];
+
+  const triggers = requireMapping(workflow.on, "workflow triggers");
+  const triggerNames = Object.keys(triggers).sort();
+  const dispatch = requireMapping(triggers.workflow_dispatch, "workflow dispatch");
+  const inputs = requireMapping(dispatch.inputs, "workflow dispatch inputs");
+  if (
+    !sameValue(triggerNames, ["workflow_dispatch"]) ||
+    !sameValue(Object.keys(inputs).sort(), ["request"])
+  ) {
+    addDiagnostic(
+      diagnostics,
+      "trigger-contract",
+      "workflow",
+      null,
+      "release workflow must dispatch only one existing request path",
+    );
+  }
+  if (!sameValue(workflow.permissions, { contents: "read" })) {
+    addDiagnostic(
+      diagnostics,
+      "permission-boundary",
+      "workflow",
+      null,
+      "workflow permissions must be exactly contents: read",
+    );
+  }
+
+  const jobNames = Object.keys(jobs).sort();
+  const expectedJobNames = Object.keys(expectedJobs).sort();
+  if (!sameValue(jobNames, expectedJobNames)) {
+    addDiagnostic(
+      diagnostics,
+      "job-contract",
+      "workflow",
+      null,
+      "release workflow must contain exactly the approved job set",
+    );
+  }
+
+  const outerSecretReferences = collectSecretReferences(
+    Object.fromEntries(Object.entries(workflow).filter(([key]) => key !== "jobs")),
+  );
+  if (outerSecretReferences.length > 0) {
+    addDiagnostic(
+      diagnostics,
+      outerSecretReferences.some(({ canonical }) => !canonical)
+        ? "secret-expression-boundary"
+        : "secret-outside-step-env",
+      "workflow",
+      null,
+      "secrets are allowed only in one consuming step env",
+    );
+  }
+
+  for (const [jobName, rawJob] of Object.entries(jobs)) {
+    const job = requireMapping(rawJob, `${jobName} job`);
+    const expected = expectedJobs[jobName];
+    if (expected !== undefined) auditJobShape(diagnostics, jobName, job, expected);
+
+    const jobReferences = collectSecretReferences(job.env ?? {});
+    if (jobReferences.length > 0) {
+      addDiagnostic(
+        diagnostics,
+        jobReferences.some(({ canonical }) => !canonical)
+          ? "secret-expression-boundary"
+          : "job-secret-scope",
+        jobName,
+        null,
+        "job-level environments may not expose credentials",
+      );
+    }
+    if (job.steps === undefined) continue;
+    if (!Array.isArray(job.steps)) {
+      throw new WorkflowPolicyError(`${jobName} job steps must be an array`);
+    }
+    for (const [index, rawStep] of job.steps.entries()) {
+      const step = requireMapping(rawStep, `${jobName} step ${index + 1}`);
+      const stepName = stepIdentity(step);
+      const envReferences = collectSecretReferences(step.env ?? {});
+      const outsideReferences = collectSecretReferencesOutsideStepEnv(step);
+      if (
+        envReferences.some(({ canonical }) => !canonical) ||
+        outsideReferences.some(({ canonical }) => !canonical)
+      ) {
+        addDiagnostic(
+          diagnostics,
+          "secret-expression-boundary",
+          jobName,
+          stepName,
+          "secret contexts must use one canonical dot expression",
+        );
+        const kind = credentialKindForJob(jobName);
+        if (kind !== null) {
+          addDiagnostic(
+            diagnostics,
+            `${kind}-credential-contract`,
+            jobName,
+            stepName,
+            `the ${kind} boundary rejects non-canonical secret access`,
+          );
+        }
+      }
+      if (outsideReferences.some(({ canonical }) => canonical)) {
+        addDiagnostic(
+          diagnostics,
+          "secret-outside-step-env",
+          jobName,
+          stepName,
+          "secret expressions are permitted only in the consuming step env",
+        );
+      }
+      if (step.env !== undefined) {
+        const env = requireMapping(step.env, `${jobName} ${stepName} env`);
+        for (const [envName, value] of Object.entries(env)) {
+          for (const reference of collectSecretReferences(value)) {
+            if (!reference.canonical) continue;
+            occurrences.push({
+              env: envName,
+              job: jobName,
+              name: reference.name,
+              step: stepName,
+              value,
+            });
+            if (CREDENTIAL_BINDINGS[reference.name] === undefined) {
+              addDiagnostic(
+                diagnostics,
+                "credential-allowlist",
+                jobName,
+                stepName,
+                `secret ${reference.name} is not approved`,
+              );
+            }
+          }
+        }
+      }
+      const secretNames = new Set(
+        envReferences.filter(({ canonical }) => canonical).map(({ name }) => name),
+      );
+      const run = typeof step.run === "string" ? step.run : "";
+      if (secretNames.has("ZERG_SOURCE_DEPLOY_KEY")) {
+        auditSourceWindow(diagnostics, jobName, stepName, run);
+      }
+      if ([...secretNames].some((name) => name?.startsWith("ZERGCHAT_APPLE_"))) {
+        auditAppleWindow(diagnostics, jobName, stepName, run);
+      }
+      if ([...secretNames].some((name) => name?.includes("TAURI_SIGNING"))) {
+        auditUpdaterWindow(diagnostics, jobName, stepName, run);
+      }
+      if (secretNames.has("ZERGCHAT_FEED_DEPLOY_KEY")) {
+        auditFeedWindow(diagnostics, jobName, stepName, run);
+      }
+    }
+  }
+
+  const kinds = new Set(Object.values(CREDENTIAL_BINDINGS).map(({ kind }) => kind));
+  for (const kind of kinds) {
+    const expected = Object.entries(CREDENTIAL_BINDINGS)
+      .filter(([, binding]) => binding.kind === kind);
+    const valid = expected.every(([name, binding]) => {
+      const matching = occurrences.filter((occurrence) => occurrence.name === name);
+      return matching.length === 1 &&
+        matching[0].job === binding.job &&
+        matching[0].step === binding.step &&
+        matching[0].env === binding.env &&
+        matching[0].value === `\${{ secrets.${name} }}`;
+    });
+    if (!valid) {
+      addDiagnostic(
+        diagnostics,
+        `${kind}-credential-contract`,
+        "workflow",
+        null,
+        `every ${kind} secret must occur once at its exact boundary`,
+      );
+    }
+  }
+
+  return [...new Map(diagnostics.map((diagnostic) => [
+    `${diagnostic.code}:${diagnostic.job}:${diagnostic.step ?? ""}`,
+    diagnostic,
+  ])).values()].sort((left, right) =>
+    `${left.code}:${left.job}:${left.step ?? ""}`.localeCompare(
+      `${right.code}:${right.job}:${right.step ?? ""}`,
+    )
+  );
 }
 
 async function main() {
   if (process.argv.length !== 3) {
     throw new WorkflowPolicyError("usage: workflow-policy.mjs WORKFLOW.yml");
   }
-  const source = await readFile(process.argv[2], "utf8");
+  const source = await readFileAsync(process.argv[2], "utf8");
   const diagnostics = auditWorkflowPolicy(source);
   process.stdout.write(`${JSON.stringify({ diagnostics }, null, 2)}\n`);
   if (diagnostics.length > 0) process.exitCode = 1;
