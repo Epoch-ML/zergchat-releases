@@ -171,6 +171,40 @@ test("the implicit GitHub token cannot authorize an added program", () => {
   assert.ok(diagnosticCodes(hostile).includes("apple-secret-window"));
 });
 
+test("workflow, job, and step execution metadata are exact", () => {
+  const rootDrift = mutateWorkflow((workflow) => {
+    workflow.concurrency.group = "attacker-controlled";
+    workflow.defaults = { run: { shell: "python" } };
+  });
+  assert.ok(diagnosticCodes(rootDrift).includes("workflow-contract"));
+
+  for (const [label, mutate] of [
+    ["job env", (workflow) => {
+      workflow.jobs["sign-updater-preview"].env.NODE_OPTIONS =
+        "--import=data:text/javascript,globalThis.compromised=true";
+    }],
+    ["job timeout", (workflow) => {
+      workflow.jobs.validate["timeout-minutes"] = 1;
+    }],
+    ["job condition", (workflow) => {
+      workflow.jobs.validate.if = "${{ always() }}";
+    }],
+    ["step continue-on-error", (workflow) => {
+      workflow.jobs.validate.steps.find(
+        ({ run }) => typeof run === "string",
+      )["continue-on-error"] = true;
+    }],
+    ["step env", (workflow) => {
+      workflow.jobs.validate.steps.find(
+        ({ run }) => typeof run === "string",
+      ).env = { NODE_OPTIONS: "--import=data:text/javascript,throw 1" };
+    }],
+  ]) {
+    const hostile = mutateWorkflow(mutate);
+    assert.ok(diagnosticCodes(hostile).includes("job-contract"), label);
+  }
+});
+
 test("secret expressions are canonical and bound to one exact consuming step", () => {
   const escaped = mutateWorkflow((workflow) => {
     workflow.jobs["apple-sign"].steps.push({
