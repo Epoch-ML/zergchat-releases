@@ -396,6 +396,20 @@ export function auditRepositoryState(state, { phase } = {}) {
       ));
     }
   }
+  const approvedReleaseWorkflows = new Set([
+    RELEASE_WORKFLOW,
+    RELEASE_POLICY_ANCHOR,
+    ".github/workflows/policy.yml",
+  ]);
+  if (
+    Array.isArray(release.workflows) &&
+    release.workflows.some(({ path }) => !approvedReleaseWorkflows.has(path))
+  ) {
+    errors.push(diagnostic(
+      "workflow-state",
+      "the release repository may contain only reviewed workflow files",
+    ));
+  }
   if (findWorkflow(release.workflows, ".github/workflows/policy.yml")?.state !== "active") {
     errors.push(diagnostic(
       "workflow-state",
@@ -407,6 +421,16 @@ export function auditRepositoryState(state, { phase } = {}) {
     release.environments,
     "release environments",
   );
+  if (
+    Object.keys(environments).some(
+      (name) => EXPECTED_ENVIRONMENTS[name] === undefined,
+    )
+  ) {
+    errors.push(diagnostic(
+      "environment-contract",
+      "the release repository may contain only reviewed environments",
+    ));
+  }
   for (const [name, expected] of Object.entries(EXPECTED_ENVIRONMENTS)) {
     const actual = environments[name];
     if (!environmentMatches(actual, expected)) {
