@@ -35,6 +35,8 @@ const testDeployKeyBlob = (() => {
 })();
 const testDeployPublicKey =
   `ssh-ed25519 ${testDeployKeyBlob.toString("base64")} test-only`;
+const testDeployPublicKeyWithoutComment =
+  `ssh-ed25519 ${testDeployKeyBlob.toString("base64")}`;
 const testDeployFingerprint =
   `SHA256:${createHash("sha256").update(testDeployKeyBlob).digest("base64").replace(/=+$/, "")}`;
 
@@ -390,6 +392,17 @@ test("public and private repository identities are exact", () => {
       assert.deepEqual(errorCodes(state), [code], `${owner}/${field}`);
     }
   }
+
+  for (const [owner, code, value] of [
+    ["release", "repository-contract", null],
+    ["release", "repository-contract", []],
+    ["source", "source-repository-contract", null],
+    ["source", "source-repository-contract", []],
+  ]) {
+    const state = idealState();
+    state[owner].repository = value;
+    assert.deepEqual(errorCodes(state), [code], `${owner}/${String(value)}`);
+  }
 });
 
 test("every environment field and required secret is exact", () => {
@@ -568,6 +581,17 @@ test("feed and source deploy-key authority is exact", () => {
     fingerprint: feedWriterFingerprint,
   });
   assert.equal(errorCodes(unrelatedSourceReader).includes("source-key"), false);
+
+  for (const [owner, code] of [
+    ["release", "deploy-key"],
+    ["source", "source-key"],
+  ]) {
+    for (const value of [null, []]) {
+      const state = idealState();
+      state[owner].deployKeys = [value];
+      assert.deepEqual(errorCodes(state), [code], `${owner}/${String(value)}`);
+    }
+  }
 });
 
 test("release-data has one bounded root topology shared with feed publication", () => {
@@ -598,6 +622,37 @@ test("release-data has one bounded root topology shared with feed publication", 
   );
   assert.equal(errorCodes(bothChannels, "live").includes("feed-branch-contract"), false);
 
+  const multiDigitStable = idealState("active");
+  multiDigitStable.release.feedBranch.entries = [
+    ...rootReleaseDataEntries(),
+    ...channelReleaseDataEntries("stable", "123.45.67"),
+  ];
+  assert.equal(
+    errorCodes(multiDigitStable, "live").includes("feed-branch-contract"),
+    false,
+  );
+
+  for (const path of [
+    "xstable/releases/1.2.3.json",
+    "stable/releases/1.2.3.json.bak",
+    "stable/releases/01.2.3.json",
+    "stable/releases/1x.2.3.json",
+    "stable/releases/1.2x.3.json",
+    "stable/releases/1.2.3x.json",
+  ]) {
+    const state = idealState("active");
+    state.release.feedBranch.entries = [
+      ...rootReleaseDataEntries(),
+      ...channelReleaseDataEntries("stable", "1.2.3"),
+    ];
+    state.release.feedBranch.entries.at(-1).path = path;
+    assert.deepEqual(
+      errorCodes(state, "live"),
+      ["feed-branch-contract"],
+      path,
+    );
+  }
+
   const mutations = [
     (branch) => { branch.name = "main"; },
     (branch) => { branch.sha = `x${"a".repeat(40)}`; },
@@ -623,8 +678,28 @@ test("release-data has one bounded root topology shared with feed publication", 
     (branch) => { branch.entries[2].size = 0; },
     (branch) => { branch.entries[5].path = "preview/releases/0.1.9.json"; },
     (branch) => {
+      branch.entries[5].path = "xpreview/releases/0.1.9-preview.1.json";
+    },
+    (branch) => {
+      branch.entries[5].path = "preview/releases/0.1.9-preview.1.json.bak";
+    },
+    (branch) => {
+      branch.entries[5].path = "preview/releases/01.1.9-preview.1.json";
+    },
+    (branch) => {
+      branch.entries[5].path = "preview/releases/0.1x.9-preview.1.json";
+    },
+    (branch) => {
+      branch.entries[5].path = "preview/releases/0.1.9-preview.1x.json";
+    },
+    (branch) => {
       branch.entries = branch.entries.filter(
         ({ path }) => path !== "preview/latest.json",
+      );
+    },
+    (branch) => {
+      branch.entries = branch.entries.filter(
+        ({ path }) => !path.includes("/releases/0.1.9-preview.1.json"),
       );
     },
   ];
@@ -656,6 +731,18 @@ test("release-data has one bounded root topology shared with feed publication", 
   });
   assert.deepEqual(errorCodes(unexpectedRoot), ["feed-branch-contract"]);
 
+  const orphanedMetadata = idealState();
+  orphanedMetadata.release.feedBranch.entries = [
+    ...rootReleaseDataEntries(),
+    {
+      path: "preview/releases/0.1.9-preview.1.json",
+      mode: "100644",
+      type: "blob",
+      size: 1,
+    },
+  ];
+  assert.deepEqual(errorCodes(orphanedMetadata), ["feed-branch-contract"]);
+
   const aggregateOverflow = idealState();
   for (let patch = 0; patch < 65; patch += 1) {
     aggregateOverflow.release.feedBranch.entries.push({
@@ -666,6 +753,39 @@ test("release-data has one bounded root topology shared with feed publication", 
     });
   }
   assert.deepEqual(errorCodes(aggregateOverflow), ["feed-branch-contract"]);
+
+  const exactAggregateLimit = idealState();
+  exactAggregateLimit.release.feedBranch.entries = [
+    ...rootReleaseDataEntries(),
+    { path: "preview", mode: "040000", type: "tree" },
+    {
+      path: "preview/latest.json",
+      mode: "100644",
+      type: "blob",
+      size: 2_048,
+    },
+    { path: "preview/releases", mode: "040000", type: "tree" },
+  ];
+  for (let patch = 0; patch < 63; patch += 1) {
+    exactAggregateLimit.release.feedBranch.entries.push({
+      path: `preview/releases/9.9.${patch}-preview.1.json`,
+      mode: "100644",
+      type: "blob",
+      size: 1_048_576,
+    });
+  }
+  exactAggregateLimit.release.feedBranch.entries.push({
+    path: "preview/releases/9.9.63-preview.1.json",
+    mode: "100644",
+    type: "blob",
+    size: 1_046_016,
+  });
+  assert.equal(
+    errorCodes(exactAggregateLimit).includes("feed-branch-contract"),
+    false,
+  );
+  exactAggregateLimit.release.feedBranch.entries.at(-1).size += 1;
+  assert.deepEqual(errorCodes(exactAggregateLimit), ["feed-branch-contract"]);
 
   const exactLimit = idealState();
   while (exactLimit.release.feedBranch.entries.length < 4_096) {
@@ -865,6 +985,179 @@ test("array pagination and hostile Link metadata fail closed", async () => {
   }, { token: "test-token", fetchImpl: async () => null }), /pagination key is invalid/);
 });
 
+test("pagination validates every URL and record boundary independently", async () => {
+  const rulesetsUrl =
+    "https://api.github.com/repos/Epoch-ML/zergchat-releases/rulesets";
+  const rejectLink = async (link, message = /untrusted pagination URL/) => {
+    await assert.rejects(requestGitHub({
+      repository: "Epoch-ML/zergchat-releases",
+      path: "rulesets",
+      paginationKey: "array",
+    }, {
+      token: "test-token",
+      fetchImpl: async () => ({
+        ok: true,
+        status: 200,
+        headers: new Headers({ link }),
+        json: async () => [],
+      }),
+    }), message, link);
+  };
+
+  for (const link of [
+    "<https://evil.invalid/repos/Epoch-ML/zergchat-releases/rulesets?page=2&per_page=100>; rel=\"next\"",
+    "<https://user@api.github.com/repos/Epoch-ML/zergchat-releases/rulesets?page=2&per_page=100>; rel=\"next\"",
+    "<https://user:secret@api.github.com/repos/Epoch-ML/zergchat-releases/rulesets?page=2&per_page=100>; rel=\"next\"",
+    `<${rulesetsUrl}?page=2&per_page=100#fragment>; rel="next"`,
+    "<https://api.github.com/repos/Epoch-ML/zergchat-releases/keys?page=2&per_page=100>; rel=\"next\"",
+    `<${rulesetsUrl}?page=2&per_page=100&extra=1>; rel="next"`,
+    `<${rulesetsUrl}?page=2&page=3&per_page=100>; rel="next"`,
+    `<${rulesetsUrl}?page=2&per_page=100&per_page=100>; rel="next"`,
+    `<${rulesetsUrl}?page=0&per_page=100>; rel="next"`,
+    `<${rulesetsUrl}?page=01&per_page=100>; rel="next"`,
+    `<${rulesetsUrl}?page=2x&per_page=100>; rel="next"`,
+    `<${rulesetsUrl}?page=101&per_page=100>; rel="next"`,
+    `<${rulesetsUrl}?page=2>; rel="next"`,
+    `<${rulesetsUrl}?page=2&per_page=99>; rel="next"`,
+  ]) await rejectLink(link);
+
+  await rejectLink(
+    `<${rulesetsUrl}?page=2&per_page=100>; rel="next", ` +
+      `<${rulesetsUrl}?page=3&per_page=100>; rel="next"`,
+    /malformed pagination Link/,
+  );
+  await rejectLink(
+    `junk <${rulesetsUrl}?page=2&per_page=100>; rel="next"`,
+    /malformed pagination Link/,
+  );
+  await rejectLink(
+    `<${rulesetsUrl}?page=2&per_page=100>; rel="next" junk`,
+    /malformed pagination Link/,
+  );
+
+  const pageOneHundredCalls = [];
+  const pageOneHundred = await requestGitHub({
+    repository: "Epoch-ML/zergchat-releases",
+    path: "rulesets",
+    paginationKey: "array",
+  }, {
+    token: "test-token",
+    fetchImpl: async (url) => {
+      pageOneHundredCalls.push(url);
+      return {
+        ok: true,
+        status: 200,
+        headers: new Headers(pageOneHundredCalls.length === 1 ? {
+          link: `<${rulesetsUrl}?page=100&per_page=100>; rel="next"`,
+        } : {}),
+        json: async () => [{ id: pageOneHundredCalls.length }],
+      };
+    },
+  });
+  assert.deepEqual(pageOneHundred, [{ id: 1 }, { id: 2 }]);
+  assert.deepEqual(pageOneHundredCalls, [
+    `${rulesetsUrl}?per_page=100`,
+    `${rulesetsUrl}?page=100&per_page=100`,
+  ]);
+
+  for (const headers of [undefined, {}]) {
+    await assert.rejects(requestGitHub({
+      repository: "Epoch-ML/zergchat-releases",
+      path: "rulesets",
+      paginationKey: "array",
+    }, {
+      token: "test-token",
+      fetchImpl: async () => ({
+        ok: true,
+        status: 200,
+        headers,
+        json: async () => [],
+      }),
+    }), /pagination headers are unavailable/);
+  }
+
+  const exactPage = Array.from({ length: 100 }, (_, id) => ({ id }));
+  assert.deepEqual(await requestGitHub({
+    repository: "Epoch-ML/zergchat-releases",
+    path: "rulesets",
+    paginationKey: "array",
+  }, {
+    token: "test-token",
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      headers: new Headers(),
+      json: async () => exactPage,
+    }),
+  }), exactPage);
+
+  await assert.rejects(requestGitHub({
+    repository: "Epoch-ML/zergchat-releases",
+    path: "rulesets",
+    paginationKey: "array",
+  }, {
+    token: "test-token",
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      headers: new Headers(),
+      json: async () => [...exactPage, { id: 100 }],
+    }),
+  }), /pagination exceeds its record limit/);
+
+  assert.deepEqual(await requestGitHub({
+    repository: "Epoch-ML/zergchat-releases",
+    path: "actions/workflows",
+    paginationKey: "workflows",
+  }, {
+    token: "test-token",
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      headers: new Headers(),
+      json: async () => ({ total_count: 0, workflows: [] }),
+    }),
+  }), { total_count: 0, workflows: [] });
+
+  for (const total_count of [-1, 0.5, "0", 10_001]) {
+    await assert.rejects(requestGitHub({
+      repository: "Epoch-ML/zergchat-releases",
+      path: "actions/workflows",
+      paginationKey: "workflows",
+    }, {
+      token: "test-token",
+      fetchImpl: async () => ({
+        ok: true,
+        status: 200,
+        headers: new Headers(),
+        json: async () => ({ total_count, workflows: [] }),
+      }),
+    }), /pagination total_count is invalid/, String(total_count));
+  }
+
+  await assert.rejects(requestGitHub({
+    repository: "Epoch-ML/zergchat-releases",
+    path: "rulesets",
+    paginationKey: "array",
+    allowNotFound: true,
+  }, { token: "test-token", fetchImpl: async () => null }),
+  /pagination cannot allow a missing resource/);
+
+  await assert.rejects(requestGitHub({
+    repository: "Epoch-ML/zergchat-releases",
+    path: "rulesets",
+    paginationKey: "array",
+  }, {
+    token: "test-token",
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      headers: new Headers(),
+      json: async () => { throw new SyntaxError("bad JSON"); },
+    }),
+  }), /returned malformed JSON/);
+});
+
 test("the GitHub boundary allows only an explicitly missing resource", async () => {
   const notFound = async () => ({
     ok: false, status: 404, json: async () => ({ message: "Not Found" }),
@@ -934,13 +1227,13 @@ test("the collector normalizes settings through one injected HTTP boundary", asy
     ["Epoch-ML/zergchat-releases:environments", { environments: [{
       name: "zergchat-feed",
       protection_rules: [
-        { type: "branch_policy" },
+        { type: "wait_timer", wait_timer: 15 },
         { type: "required_reviewers", prevent_self_review: false,
           reviewers: [
             { type: "User", reviewer: { id: 1042757 } },
             { type: "Team", reviewer: { id: 42 } },
           ] },
-        { type: "wait_timer", wait_timer: 15 },
+        { type: "branch_policy" },
       ],
       deployment_branch_policy: {
         protected_branches: false,
@@ -961,7 +1254,7 @@ test("the collector normalizes settings through one injected HTTP boundary", asy
         title: "feed key",
         verified: true,
         read_only: false,
-        key: testDeployPublicKey,
+        key: testDeployPublicKeyWithoutComment,
       },
     ]],
     ["Epoch-ML/zergchat-releases:rulesets", [{ id: 2 }, { id: 1 }]],
@@ -1019,11 +1312,13 @@ test("the collector normalizes settings through one injected HTTP boundary", asy
     }],
     ["Epoch-ML/zerg:environments/zergchat-release-request/deployment-branch-policies", {
       branch_policies: [
-        { name: "zergchat-preview-v*", type: "tag" },
         { name: "zergchat-v*", type: "tag" },
+        { name: "zergchat-preview-v*", type: "tag" },
       ],
     }],
-    ["Epoch-ML/zerg:actions/secrets", { secrets: [] }],
+    ["Epoch-ML/zerg:actions/secrets", {
+      secrets: [{ name: "Z_SOURCE_MARKER" }, { name: "A_SOURCE_MARKER" }],
+    }],
     ["Epoch-ML/zerg:keys", [{
       title: "source key",
       verified: true,
@@ -1042,9 +1337,12 @@ test("the collector normalizes settings through one injected HTTP boundary", asy
   ]);
   const calls = [];
   const pagination = [];
-  const request = async ({ repository, path, paginationKey }) => {
+  const requestOptions = [];
+  const request = async (options) => {
+    const { repository, path, paginationKey } = options;
     const key = `${repository}:${path}`;
     calls.push(key);
+    requestOptions.push(structuredClone(options));
     if (paginationKey !== undefined) pagination.push(`${key}:${paginationKey}`);
     return structuredClone(responses.get(key));
   };
@@ -1103,7 +1401,10 @@ test("the collector normalizes settings through one injected HTTP boundary", asy
     path: ".github/workflows/release.yml",
     state: "disabled_manually",
   }]);
-  assert.deepEqual(state.source.repositorySecrets, []);
+  assert.deepEqual(state.source.repositorySecrets, [
+    "A_SOURCE_MARKER",
+    "Z_SOURCE_MARKER",
+  ]);
   assert.deepEqual(state.source.workflows, [{
     path: ".github/workflows/zergchat-native-release.yml",
     state: "active",
@@ -1143,8 +1444,48 @@ test("the collector normalizes settings through one injected HTTP boundary", asy
     "Epoch-ML/zerg:keys:array",
     "Epoch-ML/zerg:rulesets:array",
   ]);
+  assert.deepEqual(
+    requestOptions.find(({ path }) => path === "immutable-releases"),
+    {
+      repository: "Epoch-ML/zergchat-releases",
+      path: "immutable-releases",
+      apiVersion: "2026-03-10",
+    },
+  );
+  assert.deepEqual(
+    requestOptions.find(({ path }) => path === "branches/release-data"),
+    {
+      repository: "Epoch-ML/zergchat-releases",
+      path: "branches/release-data",
+      allowNotFound: true,
+    },
+  );
+
+  const releaseBranchKey =
+    "Epoch-ML/zergchat-releases:branches/release-data";
+  const releaseBranch = responses.get(releaseBranchKey);
+  responses.set(releaseBranchKey, null);
+  calls.length = 0;
+  requestOptions.length = 0;
+  const bootstrapState = await collectRepositoryState({ request });
+  assert.equal(bootstrapState.release.feedBranch, null);
+  assert.equal(
+    calls.includes(
+      `Epoch-ML/zergchat-releases:git/trees/${"b".repeat(40)}?recursive=1`,
+    ),
+    false,
+  );
+  responses.set(releaseBranchKey, releaseBranch);
 
   for (const [key, malformed] of [
+    ["Epoch-ML/zergchat-releases:", {
+      ...responses.get("Epoch-ML/zergchat-releases:"),
+      full_name: null,
+    }],
+    ["Epoch-ML/zergchat-releases:", {
+      ...responses.get("Epoch-ML/zergchat-releases:"),
+      private: "false",
+    }],
     ["Epoch-ML/zergchat-releases:", {
       ...responses.get("Epoch-ML/zergchat-releases:"),
       visibility: false,
@@ -1152,6 +1493,22 @@ test("the collector normalizes settings through one injected HTTP boundary", asy
     ["Epoch-ML/zergchat-releases:", {
       ...responses.get("Epoch-ML/zergchat-releases:"),
       disabled: "false",
+    }],
+    ["Epoch-ML/zergchat-releases:", {
+      ...responses.get("Epoch-ML/zergchat-releases:"),
+      archived: "false",
+    }],
+    ["Epoch-ML/zergchat-releases:", {
+      ...responses.get("Epoch-ML/zergchat-releases:"),
+      default_branch: false,
+    }],
+    ["Epoch-ML/zerg:", {
+      ...responses.get("Epoch-ML/zerg:"),
+      full_name: "",
+    }],
+    ["Epoch-ML/zerg:", {
+      ...responses.get("Epoch-ML/zerg:"),
+      private: 1,
     }],
     ["Epoch-ML/zerg:", {
       ...responses.get("Epoch-ML/zerg:"),
@@ -1161,9 +1518,18 @@ test("the collector normalizes settings through one injected HTTP boundary", asy
       ...responses.get("Epoch-ML/zerg:"),
       disabled: 0,
     }],
+    ["Epoch-ML/zerg:", {
+      ...responses.get("Epoch-ML/zerg:"),
+      archived: null,
+    }],
+    ["Epoch-ML/zerg:", {
+      ...responses.get("Epoch-ML/zerg:"),
+      default_branch: [],
+    }],
     ["Epoch-ML/zergchat-releases:actions/secrets", { secrets: "invalid" }],
     ["Epoch-ML/zerg:actions/secrets", { secrets: null }],
     ["Epoch-ML/zergchat-releases:rulesets", { rulesets: [] }],
+    ["Epoch-ML/zergchat-releases:rulesets", [{ id: 1 }, { id: 1 }]],
     ["Epoch-ML/zerg:environments", {
       environments: [{
         name: "zergchat-release-request", protection_rules: "invalid",
@@ -1203,6 +1569,42 @@ test("the collector normalizes settings through one injected HTTP boundary", asy
       key,
     );
     responses.set(key, original);
+  }
+
+  const deployKeyBytesWith = (mutate) => {
+    const bytes = Buffer.from(testDeployKeyBlob);
+    mutate(bytes);
+    return `ssh-ed25519 ${bytes.toString("base64")} test-only`;
+  };
+  const encodedDeployKey = testDeployKeyBlob.toString("base64");
+  const invalidDeployPublicKeys = [
+    encodedDeployKey,
+    `ssh-ed25519 ${encodedDeployKey} comment extra`,
+    `ssh-rsa ${encodedDeployKey} test-only`,
+    `ssh-ed25519 !${encodedDeployKey}`,
+    `ssh-ed25519 ${encodedDeployKey}!`,
+    `ssh-ed25519 ${encodedDeployKey}=`,
+    `ssh-ed25519 ${Buffer.alloc(50).toString("base64")}`,
+    deployKeyBytesWith((bytes) => { bytes.writeUInt32BE(10, 0); }),
+    deployKeyBytesWith((bytes) => { bytes[4] = "x".charCodeAt(0); }),
+    deployKeyBytesWith((bytes) => { bytes.writeUInt32BE(31, 15); }),
+    `ssh-ed25519 ${Buffer.concat([
+      testDeployKeyBlob,
+      Buffer.from([0]),
+    ]).toString("base64")}`,
+  ];
+  for (const key of invalidDeployPublicKeys) {
+    const responseKey = "Epoch-ML/zergchat-releases:keys";
+    const original = responses.get(responseKey);
+    responses.set(responseKey, [{
+      title: "feed key", verified: true, read_only: false, key,
+    }]);
+    await assert.rejects(
+      collectRepositoryState({ request }),
+      (error) => error instanceof RepositoryPreflightError,
+      key,
+    );
+    responses.set(responseKey, original);
   }
 });
 
