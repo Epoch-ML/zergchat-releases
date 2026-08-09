@@ -672,13 +672,25 @@ async function collectEnvironments(request, repository, response) {
     );
     const reviewers = reviewerRules.flatMap((rule) =>
       requireArray(rule.reviewers, `${record.name} required reviewers`)
-        .flatMap((reviewer) => {
-            const type = reviewer?.type;
-            const id = reviewer?.reviewer?.id;
-            return typeof type === "string" && Number.isSafeInteger(id)
-              ? [`${type}:${id}`]
-              : [];
-          })
+        .map((rawReviewer) => {
+          const reviewer = requireObject(
+            rawReviewer,
+            `${record.name} required reviewer`,
+          );
+          const subject = requireObject(
+            reviewer.reviewer,
+            `${record.name} required reviewer subject`,
+          );
+          if (
+            typeof reviewer.type !== "string" ||
+            !Number.isSafeInteger(subject.id)
+          ) {
+            throw new RepositoryPreflightError(
+              `${record.name} required reviewer identity is invalid`,
+            );
+          }
+          return `${reviewer.type}:${subject.id}`;
+        })
     );
     const preventSelfReview = reviewerRules.length === 0
       ? null
