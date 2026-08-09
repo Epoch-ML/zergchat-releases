@@ -161,12 +161,20 @@ function idealState(releaseState = "disabled_manually") {
   });
 }
 
+function errorCodes(state, phase = "cutover") {
+  return auditRepositoryState(state, { phase }).errors.map(({ code }) => code);
+}
+
 test("cutover and live phases require exact workflow states", () => {
   const cutover = auditRepositoryState(idealState(), { phase: "cutover" });
   assert.deepEqual(cutover.errors, []);
   assert.deepEqual(cutover.warnings.map(({ code }) => code), ["human-review-limitation"]);
   const live = auditRepositoryState(idealState("active"), { phase: "live" });
   assert.deepEqual(live.errors, []);
+  assert.deepEqual(errorCodes(idealState("active"), "cutover"), [
+    "workflow-state",
+  ]);
+  assert.deepEqual(errorCodes(idealState(), "live"), ["workflow-state"]);
 });
 
 test("immutability, Pages, feed, workflow, key, secret, and rules drift fail closed", () => {
@@ -210,6 +218,166 @@ test("source request environment remains secret-free and tag scoped", () => {
     auditRepositoryState(state, { phase: "cutover" }).errors
       .some(({ code }) => code === "source-environment-contract"),
   );
+});
+
+test("every Pages and workflow identity is independently enforced", () => {
+  for (const mutate of [
+    (pages) => { pages.https_enforced = false; },
+    (pages) => { pages.build_type = "legacy"; },
+    (pages) => { pages.html_url = "https://example.invalid/"; },
+    (pages) => { pages.public = false; },
+  ]) {
+    const state = idealState();
+    mutate(state.release.pages);
+    assert.deepEqual(errorCodes(state), ["pages-contract"]);
+  }
+
+  for (const [owner, path] of [
+    ["release", ".github/workflows/release.yml"],
+    ["release", ".github/workflows/policy-anchor.yml"],
+    ["release", ".github/workflows/policy.yml"],
+    ["source", ".github/workflows/zergchat-native-release.yml"],
+    ["source", ".github/workflows/zergchat-release-policy-anchor.yml"],
+  ]) {
+    const state = idealState();
+    state[owner].workflows = state[owner].workflows.filter(
+      (workflow) => workflow.path !== path,
+    );
+    assert.deepEqual(errorCodes(state), ["workflow-state"], path);
+  }
+
+  const unrelated = idealState();
+  unrelated.release.workflows.push({
+    path: ".github/workflows/unrelated.yml",
+    state: "active",
+  });
+  assert.equal(errorCodes(unrelated).includes("workflow-state"), false);
+});
+
+test("every environment field and required secret is exact", () => {
+  for (const name of Object.keys(environments)) {
+    for (const mutate of [
+      (environment) => { environment.refs = []; },
+      (environment) => { environment.secrets.push("UNEXPECTED_SECRET"); },
+      (environment) => { environment.reviewers = ["Team:42"]; },
+      (environment) => { environment.prevent_self_review = true; },
+      (environment) => { environment.wait_timer = 5; },
+    ]) {
+      const state = idealState();
+      mutate(state.release.environments[name]);
+      assert.deepEqual(errorCodes(state), ["environment-contract"], name);
+    }
+  }
+  const missing = idealState();
+  delete missing.release.environments["zergchat-preview-build"];
+  assert.deepEqual(errorCodes(missing), ["environment-contract"]);
+
+  for (const mutate of [
+    (environment) => { environment.refs = ["branch:development"]; },
+    (environment) => { environment.secrets = ["WRITE_KEY"]; },
+    (environment) => { environment.reviewers = [reviewer]; },
+    (environment) => { environment.prevent_self_review = false; },
+    (environment) => { environment.wait_timer = 5; },
+  ]) {
+    const state = idealState();
+    mutate(state.source.environments["zergchat-release-request"]);
+    assert.deepEqual(errorCodes(state), ["source-environment-contract"]);
+  }
+});
+
+test("every ruleset identity, reference, bypass, and rule is exact", () => {
+  for (const owner of ["release", "source"]) {
+    const expectedCode = owner === "release"
+      ? "ruleset-contract"
+      : "source-ruleset-contract";
+    for (const index of idealState()[owner].rulesets.keys()) {
+      for (const field of ["refs", "bypass", "rules"]) {
+        const state = idealState();
+        const value = state[owner].rulesets[index][field];
+        state[owner].rulesets[index][field] = value.length === 0
+          ? ["unexpected"]
+          : [];
+        assert.deepEqual(errorCodes(state), [expectedCode], `${owner}/${index}/${field}`);
+      }
+      const missing = idealState();
+      missing[owner].rulesets.splice(index, 1);
+      assert.deepEqual(errorCodes(missing), [expectedCode], `${owner}/${index}`);
+    }
+  }
+});
+
+test("feed and source deploy-key authority is exact", () => {
+  for (const mutate of [
+    (state) => { state.release.deployKeys[0].verified = false; },
+    (state) => { state.release.deployKeys[0].read_only = true; },
+    (state) => { state.release.deployKeys[0].title = "unrelated writer"; },
+    (state) => { state.release.deployKeys.push({
+      title: "second writer", verified: true, read_only: false,
+    }); },
+  ]) {
+    const state = idealState();
+    mutate(state);
+    assert.deepEqual(errorCodes(state), ["deploy-key"]);
+  }
+  const harmlessReader = idealState();
+  harmlessReader.release.deployKeys.push({
+    title: "read-only observer", verified: true, read_only: true,
+  });
+  assert.equal(errorCodes(harmlessReader).includes("deploy-key"), false);
+
+  for (const mutate of [
+    (key) => { key.verified = false; },
+    (key) => { key.read_only = false; },
+    (key) => { key.title = "unrelated reader"; },
+  ]) {
+    const state = idealState();
+    mutate(state.source.deployKeys[0]);
+    assert.deepEqual(errorCodes(state), ["source-key"]);
+  }
+});
+
+test("every bounded release-data branch invariant is enforced", () => {
+  const mutations = [
+    (branch) => { branch.name = "main"; },
+    (branch) => { branch.sha = `x${"a".repeat(40)}`; },
+    (branch) => { branch.tree_sha = `${"b".repeat(40)}x`; },
+    (branch) => { branch.truncated = true; },
+    (branch) => { branch.entries = []; },
+    (branch) => { branch.entries.push(structuredClone(branch.entries[0])); },
+    (branch) => { branch.entries[1] = null; },
+    (branch) => { branch.entries[1] = []; },
+    (branch) => { branch.entries[0].mode = "100644"; },
+    (branch) => { branch.entries[0].type = "blob"; },
+    (branch) => { branch.entries[1].path = "outside/policy.mjs"; },
+    (branch) => { branch.entries[1].path = ""; },
+    (branch) => { branch.entries[1].path = 7; },
+    (branch) => { branch.entries[1].mode = "100755"; },
+    (branch) => { branch.entries[1].type = "commit"; },
+    (branch) => { branch.entries[1].path = `site/${"x".repeat(508)}`; },
+    (branch) => {
+      branch.entries = branch.entries.filter(
+        ({ path }) => path !== "site/index.html",
+      );
+    },
+  ];
+  for (const mutate of mutations) {
+    const state = idealState();
+    mutate(state.release.feedBranch);
+    assert.deepEqual(errorCodes(state), ["feed-branch-contract"]);
+  }
+
+  const exactLimit = idealState();
+  while (exactLimit.release.feedBranch.entries.length < 4_096) {
+    const index = exactLimit.release.feedBranch.entries.length;
+    exactLimit.release.feedBranch.entries.push({
+      path: `site/generated/${index}.json`, mode: "100644", type: "blob",
+    });
+  }
+  assert.equal(errorCodes(exactLimit).includes("feed-branch-contract"), false);
+  exactLimit.release.feedBranch.entries.push({
+    path: "site/generated/overflow.json", mode: "100644", type: "blob",
+  });
+  assert.deepEqual(errorCodes(exactLimit), ["feed-branch-contract"]);
 });
 
 test("invalid phases and repository documents throw exact public errors", () => {
