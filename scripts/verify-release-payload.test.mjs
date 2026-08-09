@@ -319,7 +319,7 @@ describe("canonical Zergchat release payload verification", () => {
       releaseRepository: `  ${releaseRepository}  `,
     });
 
-    for (const directory of [null, "  "]) {
+    for (const directory of [null, 42, "  "]) {
       await expectPayloadError(
         { ...valid, directory },
         "release directory is required",
@@ -327,6 +327,7 @@ describe("canonical Zergchat release payload verification", () => {
     }
     for (const invalidRepository of [
       null,
+      42,
       "  ",
     ]) {
       await expectPayloadError(
@@ -352,6 +353,10 @@ describe("canonical Zergchat release payload verification", () => {
     }
     await expectPayloadError(
       { ...valid, expectedNamesDirectory: "  " },
+      "expected-names directory must be non-empty",
+    );
+    await expectPayloadError(
+      { ...valid, expectedNamesDirectory: 42 },
       "expected-names directory must be non-empty",
     );
 
@@ -436,6 +441,25 @@ describe("canonical Zergchat release payload verification", () => {
           request: request(),
         },
         "release payload must contain exactly one updater archive and disk image",
+      );
+    }
+
+    for (const [fixtureField, wrongName] of [
+      ["archiveName", "Zergchat_9.9.9_universal.app.tar.gz"],
+      ["diskImageName", "Zergchat_9.9.9_universal.dmg"],
+    ]) {
+      const wrongVersionName = await makePayload("canonical release");
+      await rename(
+        join(wrongVersionName.directory, wrongVersionName[fixtureField]),
+        join(wrongVersionName.directory, wrongName),
+      );
+      await expectPayloadError(
+        {
+          directory: wrongVersionName.directory,
+          releaseRepository,
+          request: request(),
+        },
+        "release payload artifact names do not match the requested universal build",
       );
     }
 
