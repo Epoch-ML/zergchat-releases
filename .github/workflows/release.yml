@@ -305,7 +305,7 @@ jobs:
           cargo test --locked --manifest-path src-tauri/Cargo.toml
           cargo check --locked --lib --manifest-path src-tauri/Cargo.toml
           cargo clippy --locked --lib --manifest-path src-tauri/Cargo.toml -- -D warnings
-          rustfmt --edition 2021 --check src-tauri/src/lib.rs
+          cargo fmt --all --manifest-path src-tauri/Cargo.toml -- --check
 
       - name: Write and verify the ZergChat release configuration
         env:
