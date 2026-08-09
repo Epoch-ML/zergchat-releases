@@ -65,6 +65,56 @@ describe("ZergChat source-build release contract", () => {
     }
   });
 
+  it("binds source media capabilities to public bytes before source execution", () => {
+    const build = requireJob("build-macos");
+    const bindIndex = build.steps.findIndex(
+      (step) => step.name === "Bind source media capabilities to the public entitlement contract",
+    );
+    const cleanupIndex = build.steps.findIndex(
+      (step) => step.name === "Delete ephemeral source deploy key",
+    );
+    const sourceGateIndex = build.steps.findIndex(
+      (step) => step.name === "Test and audit the exact source",
+    );
+    assert.ok(
+      cleanupIndex >= 0 && bindIndex > cleanupIndex && sourceGateIndex > bindIndex,
+      "public media bytes must bind after credential deletion and before source execution",
+    );
+
+    const binding = build.steps[bindIndex];
+    assert.equal(binding.env, undefined);
+    assert.equal(binding["working-directory"], undefined);
+    assert.doesNotMatch(JSON.stringify(binding), /secrets\.|SOURCE_DEPLOY_KEY/);
+    for (const variable of [
+      "public_entitlements",
+      "source_entitlements",
+      "source_config",
+      "source_info",
+    ]) {
+      assert.match(
+        binding.run,
+        new RegExp(`test -f "\\$${variable}" && test ! -L "\\$${variable}"`),
+        `${variable} must be one regular non-symlink file`,
+      );
+    }
+    for (const token of [
+      "source/zapps/zergchat/src-tauri/tauri.conf.json",
+      "config.bundle.macOS.entitlements",
+      "Entitlements.plist",
+      "config.bundle.macOS.infoPlist",
+      "Info.plist",
+      "NSMicrophoneUsageDescription",
+      "NSCameraUsageDescription",
+      "NSScreenCaptureUsageDescription",
+      "NSLocalNetworkUsageDescription",
+      "cmp --silent",
+      "macos/Zergchat.entitlements.plist",
+      "source/zapps/zergchat/src-tauri/Entitlements.plist",
+    ]) {
+      assert.ok(binding.run.includes(token), `media binding must enforce ${token}`);
+    }
+  });
+
   it("generates the fail-closed production config without a mutable updater flag", () => {
     const build = requireJob("build-macos");
     const config = requireStep(build, "Write and verify the ZergChat release configuration");
@@ -116,6 +166,55 @@ describe("ZergChat source-build release contract", () => {
     assert.match(signing.run, /stapler validate "\$dmg"/);
     assert.match(signing.run, /spctl --assess --type open --context context:primary-signature/);
     assert.match(signing.run, /source=Notarized Developer ID/);
+  });
+
+  it("semantically verifies outer-app media entitlements after signing and fresh extraction", () => {
+    const apple = requireJob("apple-sign");
+    const signing = requireStep(
+      apple,
+      "Apply preview ad-hoc or fail-closed stable Apple signing",
+    );
+    assert.match(
+      signing.run,
+      /scripts\/sign-macos-app\.sh "\$app" "\$identity" "\$CHANNEL" "\$VERSION" \\\n+\s+macos\/Zergchat\.entitlements\.plist/,
+    );
+    for (const token of [
+      "codesign -d --entitlements - --xml \"$app\"",
+      "plutil -convert json",
+      "assert.deepEqual(actual, expected)",
+      '"com.apple.security.network.client": true',
+      '"com.apple.security.network.server": true',
+      '"com.apple.security.device.audio-input": true',
+      '"com.apple.security.device.camera": true',
+      '"com.apple.security.cs.allow-jit": true',
+      '"com.apple.security.cs.allow-unsigned-executable-memory": true',
+      '"com.apple.security.app-sandbox": false',
+    ]) {
+      assert.ok(signing.run.includes(token), `Apple signing must enforce ${token}`);
+    }
+    assert.doesNotMatch(signing.run, /source\/zapps|git -C source|npm run|cargo/);
+
+    const smoke = requireStep(
+      requireJob("signed-smoke"),
+      "Audit and launch the signed universal application",
+    );
+    const entitlementAudit = smoke.run.indexOf(
+      "codesign -d --entitlements - --xml \"$app\"",
+    );
+    const launch = smoke.run.indexOf('"$executable" >"$log"');
+    assert.ok(
+      entitlementAudit >= 0 && launch > entitlementAudit,
+      "fresh extraction must verify signed entitlements before launching",
+    );
+    for (const token of [
+      "plutil -convert json",
+      "assert.deepEqual(actual, expected)",
+      '"com.apple.security.device.audio-input": true',
+      '"com.apple.security.device.camera": true',
+    ]) {
+      assert.ok(smoke.run.includes(token), `fresh smoke must enforce ${token}`);
+    }
+    assert.doesNotMatch(smoke.run, /source\/zapps|git -C source|npm run|cargo/);
   });
 
   it("signs and publishes the exact universal updater archive", () => {

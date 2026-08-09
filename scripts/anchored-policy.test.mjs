@@ -126,6 +126,7 @@ test("audits immutable head workflow bytes and rejects protected policy changes"
   for (const protectedPath of [
     ".github/workflows/unreviewed.yml",
     "keys/zergchat-preview-updater.pubkey",
+    "macos/Zergchat.entitlements.plist",
     "scripts/feed-promotion.mjs",
   ]) {
     const trustRootChange = structuredClone(safe);
@@ -248,6 +249,7 @@ test("protects every future base policy root but permits only the candidate work
     "package-lock.json",
     "scripts/new-policy.mjs",
     "keys/new-root.pubkey",
+    "macos/new-entitlement.plist",
     ".github/workflows/new-policy.yml",
     ".github/CODEOWNERS",
   ]) {
