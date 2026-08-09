@@ -47,6 +47,23 @@ function mutatePolicyWorkflow(mutator) {
   return stringify(workflow);
 }
 
+function findSecretLocations(workflow) {
+  const locations = [];
+  for (const [jobName, job] of Object.entries(workflow.jobs)) {
+    for (const step of job.steps) {
+      for (const [envName, value] of Object.entries(step.env ?? {})) {
+        const match = typeof value === "string"
+          ? value.match(/^\$\{\{ secrets\.([A-Z0-9_]+) \}\}$/)
+          : null;
+        if (match !== null) {
+          locations.push({ envName, jobName, name: match[1], step });
+        }
+      }
+    }
+  }
+  return locations;
+}
+
 test("the current release workflow satisfies the protected contract", () => {
   assert.deepEqual(auditWorkflowPolicy(canonicalSource), []);
 });
@@ -120,6 +137,20 @@ test("the workflow cannot widen permissions or add reusable secret jobs", () => 
   const codes = diagnosticCodes(widened);
   assert.ok(codes.includes("permission-boundary"));
   assert.ok(codes.includes("job-contract"));
+});
+
+test("reusable workflow and forwarded-secret fields fail independently", () => {
+  for (const field of ["uses", "secrets"]) {
+    const hostile = mutateWorkflow((workflow) => {
+      workflow.jobs.validate[field] = field === "uses"
+        ? "Epoch-ML/unsafe/.github/workflows/export.yml@main"
+        : "inherit";
+    });
+    assert.ok(
+      diagnosticIdentities(hostile).includes("job-contract:validate:job"),
+      field,
+    );
+  }
 });
 
 test("the implicit GitHub token cannot authorize an added program", () => {
@@ -196,6 +227,34 @@ test("every secret context form is rejected without prose false positives", () =
   }
 });
 
+test("canonical secret syntax is anchored to the whole expression", () => {
+  for (const value of [
+    "${{ true && secrets.ZERGCHAT_APPLE_API_KEY_ID }}",
+    "${{ secrets.ZERGCHAT_APPLE_API_KEY_ID || false }}",
+  ]) {
+    const hostile = mutateWorkflow((workflow) => {
+      workflow.jobs.validate.steps[0].env = { KEY: value };
+    });
+    assert.ok(
+      diagnosticCodes(hostile).includes("secret-expression-boundary"),
+      value,
+    );
+  }
+});
+
+test("job-level canonical and non-canonical secret contexts are rejected", () => {
+  for (const [value, expectedCode] of [
+    ["${{ secrets.ZERGCHAT_FEED_DEPLOY_KEY }}", "job-secret-scope"],
+    ["${{ secrets['ZERGCHAT_FEED_DEPLOY_KEY'] }}",
+      "secret-expression-boundary"],
+  ]) {
+    const hostile = mutateWorkflow((workflow) => {
+      workflow.jobs.validate.env = { NESTED: [{ KEY: value }] };
+    });
+    assert.ok(diagnosticCodes(hostile).includes(expectedCode), value);
+  }
+});
+
 test("non-canonical source, Apple, updater, and feed access reports its boundary", () => {
   for (const [jobName, secretName, expectedCode] of [
     ["build-macos", "ZERG_SOURCE_DEPLOY_KEY", "source-credential-contract"],
@@ -235,6 +294,65 @@ test("canonical secrets cannot move, duplicate, or appear outside step env", () 
       "Check out the exact SHA and matching source tag",
   ));
   assert.ok(identities.includes("source-credential-contract:workflow:job"));
+});
+
+test("every approved secret is individually required at its exact env name", () => {
+  const canonical = parse(canonicalSource);
+  const locations = findSecretLocations(canonical);
+  assert.deepEqual(
+    locations.map(({ name }) => name).sort(),
+    [
+      "ZERGCHAT_APPLE_API_ISSUER",
+      "ZERGCHAT_APPLE_API_KEY_ID",
+      "ZERGCHAT_APPLE_API_PRIVATE_KEY",
+      "ZERGCHAT_APPLE_CERTIFICATE",
+      "ZERGCHAT_APPLE_CERTIFICATE_PASSWORD",
+      "ZERGCHAT_APPLE_SIGNING_IDENTITY",
+      "ZERGCHAT_FEED_DEPLOY_KEY",
+      "ZERGCHAT_PREVIEW_TAURI_SIGNING_PRIVATE_KEY",
+      "ZERGCHAT_PREVIEW_TAURI_SIGNING_PRIVATE_KEY_PASSWORD",
+      "ZERGCHAT_STABLE_TAURI_SIGNING_PRIVATE_KEY",
+      "ZERGCHAT_STABLE_TAURI_SIGNING_PRIVATE_KEY_PASSWORD",
+      "ZERG_SOURCE_DEPLOY_KEY",
+    ].sort(),
+  );
+
+  for (const location of locations) {
+    const expectedKind = location.name === "ZERG_SOURCE_DEPLOY_KEY"
+      ? "source"
+      : location.name.startsWith("ZERGCHAT_APPLE_")
+        ? "apple"
+        : location.name === "ZERGCHAT_FEED_DEPLOY_KEY"
+          ? "feed"
+          : "updater";
+    for (const mutation of ["remove", "rename-env"]) {
+      const hostile = mutateWorkflow((workflow) => {
+        const current = findSecretLocations(workflow).find(
+          ({ name }) => name === location.name,
+        );
+        assert.notEqual(current, undefined, location.name);
+        if (mutation === "remove") delete current.step.env[current.envName];
+        else {
+          current.step.env[`${current.envName}_MOVED`] =
+            current.step.env[current.envName];
+          delete current.step.env[current.envName];
+        }
+      });
+      assert.ok(
+        diagnosticCodes(hostile).includes(`${expectedKind}-credential-contract`),
+        `${location.name}/${mutation}`,
+      );
+    }
+  }
+});
+
+test("an unknown canonical secret is rejected by the global allowlist", () => {
+  const hostile = mutateWorkflow((workflow) => {
+    workflow.jobs.validate.steps[0].env = {
+      UNKNOWN: "${{ secrets.ZERGCHAT_UNREVIEWED_KEY }}",
+    };
+  });
+  assert.ok(diagnosticCodes(hostile).includes("credential-allowlist"));
 });
 
 test("source, Apple, updater, and feed credentials stay inside bounded windows", () => {
@@ -348,6 +466,39 @@ test("every job preserves its exact runner, permissions, environment, and progra
   }
 });
 
+test("every run-step execution field is protected independently", () => {
+  const canonical = parse(canonicalSource);
+  for (const [field, value] of [
+    ["name", "Renamed protected program"],
+    ["id", "injected-id"],
+    ["if", "${{ always() }}"],
+    ["shell", "python"],
+    ["working-directory", "/tmp"],
+  ]) {
+    const hostile = mutateWorkflow((workflow) => {
+      const step = workflow.jobs.validate.steps.find(
+        ({ run }) => typeof run === "string",
+      );
+      step[field] = value;
+    });
+    assert.ok(
+      diagnosticIdentities(hostile).some((identity) =>
+        identity.startsWith("job-contract:validate:")
+      ),
+      field,
+    );
+  }
+
+  const mixed = mutateWorkflow((workflow) => {
+    const index = canonical.jobs.validate.steps.findIndex(
+      ({ run }) => typeof run === "string",
+    );
+    workflow.jobs.validate.steps[index].uses =
+      "Epoch-ML/unsafe/executable-action@main";
+  });
+  assert.ok(diagnosticCodes(mixed).includes("action-contract"));
+});
+
 test("dispatch, workflow permissions, and action inputs are exact", () => {
   for (const hostile of [
     mutateWorkflow((workflow) => { delete workflow.on; }),
@@ -452,4 +603,15 @@ test("the CLI selects release and policy gates and exposes their exit status", a
   const usage = spawnSync(process.execPath, [policyCli], { encoding: "utf8" });
   assert.equal(usage.status, 1);
   assert.match(usage.stderr, /usage: workflow-policy\.mjs/);
+
+  for (const args of [
+    [fileURLToPath(workflowPath), "--wrong"],
+    [fileURLToPath(workflowPath), "--policy-ci", "extra"],
+  ]) {
+    const invalid = spawnSync(process.execPath, [policyCli, ...args], {
+      encoding: "utf8",
+    });
+    assert.equal(invalid.status, 1, args.join(" "));
+    assert.match(invalid.stderr, /usage: workflow-policy\.mjs/);
+  }
 });
