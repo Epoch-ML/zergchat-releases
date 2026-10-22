@@ -1,0 +1,205 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-22T20:40:47.831093+00:00",
+  "release": {
+    "version": "0.1.12",
+    "channel": "stable",
+    "url": "https://github.com/Epoch-ML/zergchat-releases/releases/tag/zergchat-v0.1.12",
+    "releaseId": 421174956,
+    "publishedAt": "2026-10-22T20:35:30Z",
+    "immutable": true,
+    "assetCount": 6,
+    "publicRequestCommit": "57b316968b6f0c4a0138f4cd51422b4a863cac50",
+    "sourceSha": "a4d5675e01b9839f9a34c9e039f9908297f808b1",
+    "sourceTag": "zergchat-v0.1.12"
+  },
+  "updaterRoot": {
+    "keyId": "55B88A007E16D659",
+    "sha256": "72e69951eb2b25e83adb69fa6da6373e842127cdd6d597b4f95e7572dc60d860",
+    "independentMinisignVerified": true
+  },
+  "assets": [
+    {
+      "name": "checksums-macos.txt",
+      "bytes": 392,
+      "sha256": "23653ad5e42cd8f906561c0fd49e2726b65a1386db8f28334f3900a4398ca3af",
+      "anonymousHTTPS": true
+    },
+    {
+      "name": "macos-notarized.txt",
+      "bytes": 164,
+      "sha256": "44e5a6f7c3cf3f5fd9c3458312c41b58e61bfa0f60253d532c7403ce4c1e8284",
+      "anonymousHTTPS": true
+    },
+    {
+      "name": "manual-release-metadata.json",
+      "bytes": 1944,
+      "sha256": "17921c820d93985cc50c9ec031750c89a417d39260cce9b701008aa1e1fb2bcf",
+      "anonymousHTTPS": true
+    },
+    {
+      "name": "Zergchat_0.1.12_universal.app.tar.gz",
+      "bytes": 12156573,
+      "sha256": "f0e192166d101b05c3373a3f04d1e3efd911491f417647d575f6507f16cf830a",
+      "anonymousHTTPS": true
+    },
+    {
+      "name": "Zergchat_0.1.12_universal.app.tar.gz.sig",
+      "bytes": 428,
+      "sha256": "fdb1c463df3f63c376dae3075bcef9126ab1f49b0e054063214e722b918d0419",
+      "anonymousHTTPS": true
+    },
+    {
+      "name": "Zergchat_0.1.12_universal.dmg",
+      "bytes": 13409746,
+      "sha256": "db15b695fdc26b7738384e9a28b12d4a69bf2a593acccf6554faebd89e3f0054",
+      "anonymousHTTPS": true
+    }
+  ],
+  "platformVersions": {
+    "macos": "0.1.12",
+    "windows": "0.1.10",
+    "linux": "0.1.10",
+    "androidPilot": "0.1.8 debug APK"
+  },
+  "webDeployment": {
+    "sourceSha": "a4d5675e01b9839f9a34c9e039f9908297f808b1",
+    "imageDigest": "sha256:87c719b948be9323eadc201cd1fe2f835ee91a8c3cc197934541e4f4472c49aa",
+    "healthy": true,
+    "schemaApplied": 27,
+    "schemaRequired": 27,
+    "configurationChanges": [
+      "image"
+    ]
+  },
+  "publicMacUpdate": {
+    "fromVersion": "0.1.11",
+    "toVersion": "0.1.12",
+    "normalProductionUpdaterUsed": true,
+    "normalRestartToUpdateClicked": true,
+    "oldProcessExited": true,
+    "automaticRestartObservedBeforeAnyManualLaunch": true,
+    "sameOwnedApplicationCopyPath": true,
+    "binarySha256": "2363fedcc784fddeec4d740ca5c92a8d35721cbb07aab2b6269eeb33362a0d9f",
+    "codesignAndGatekeeperPassed": true,
+    "testIpcUsed": false,
+    "profileIsolationClaimed": false,
+    "storageScope": "Separate application copy shared ordinary Keychain and WebView storage.",
+    "installedApplicationUpdated": false,
+    "installedVersionUnchanged": "0.1.10",
+    "workspaceRetained": true,
+    "bothConversationPanesRetained": true,
+    "retainedPaneCount": 2,
+    "filesSearchVisible": true,
+    "legacyPublicSectionRemoved": true,
+    "personFolderVisible": true,
+    "noRedundantUpdateOffer": true
+  },
+  "anonymousDelivery": {
+    "matrix": [
+      {
+        "target": "darwin",
+        "arch": "aarch64",
+        "currentVersion": "0.1.11",
+        "status": 200,
+        "offeredVersion": "0.1.12"
+      },
+      {
+        "target": "darwin",
+        "arch": "aarch64",
+        "currentVersion": "0.1.12",
+        "status": 204,
+        "offeredVersion": null
+      },
+      {
+        "target": "darwin",
+        "arch": "x86_64",
+        "currentVersion": "0.1.11",
+        "status": 200,
+        "offeredVersion": "0.1.12"
+      },
+      {
+        "target": "darwin",
+        "arch": "x86_64",
+        "currentVersion": "0.1.12",
+        "status": 204,
+        "offeredVersion": null
+      },
+      {
+        "target": "windows",
+        "arch": "x86_64",
+        "currentVersion": "0.1.9",
+        "status": 200,
+        "offeredVersion": "0.1.10"
+      },
+      {
+        "target": "windows",
+        "arch": "x86_64",
+        "currentVersion": "0.1.10",
+        "status": 204,
+        "offeredVersion": null
+      },
+      {
+        "target": "linux",
+        "arch": "x86_64",
+        "currentVersion": "0.1.9",
+        "status": 200,
+        "offeredVersion": "0.1.10"
+      },
+      {
+        "target": "linux",
+        "arch": "x86_64",
+        "currentVersion": "0.1.10",
+        "status": 204,
+        "offeredVersion": null
+      }
+    ],
+    "facadeDmgFullBytesVerified": 13409746,
+    "downloadsPageOffers": "0.1.12"
+  },
+  "sourceQualification": {
+    "fullAppWorkflows": 4,
+    "uiAndClientCommands": 34,
+    "backendAclOrderingAndPrivacy": 34,
+    "legacyFilingIntegrationAndUi": 12,
+    "folderAndWebhookIntegration": 2,
+    "personalFocused": 35,
+    "personalFinalOrdering": 6,
+    "postgresDurability": "passed",
+    "typecheck": "passed",
+    "sizingTokens": "passed",
+    "propertyBasedCoverage": true,
+    "mutationScopes": {
+      "backendControlled": {
+        "killed": 34,
+        "equivalent": 1
+      },
+      "personalBounded": {
+        "killed": 131,
+        "equivalent": 0
+      },
+      "uiStrykerAndExactReplays": {
+        "killed": 86,
+        "equivalent": 12
+      },
+      "uiAdditionalControlled": {
+        "killed": 18,
+        "equivalent": 1
+      }
+    }
+  },
+  "notExercised": [
+    "Intel Mac runtime",
+    "fresh DMG drag-to-Applications installation UI",
+    "new Windows/Linux builds or interactive acceptance"
+  ],
+  "baselineQualifications": [
+    "Theme check reports pre-existing FakeidanBotManager.vue --red custom property."
+  ],
+  "cleanup": {
+    "ownedAppStopped": true,
+    "installedAppRegisteredAgain": true,
+    "ownedPostgresStopped": true,
+    "noChatMessagesSent": true
+  }
+}

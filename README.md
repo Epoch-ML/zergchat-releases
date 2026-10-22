@@ -15,6 +15,8 @@ The [October 22 runtime results](docs/bootstrap-20261022-results.md) record
 published assets, observed updates and platform-specific acceptance limits.
 The [0.1.11 macOS acceptance](docs/desktop-0.1.11-20261022-results.md) records
 the public update, retained session, unified header and per-platform updater checks.
+The [0.1.12 file-tree acceptance](docs/desktop-0.1.12-20261022-results.md) records
+the nested explorer, private filing, permission checks and public Mac update.
 
 ## Release flow
 
