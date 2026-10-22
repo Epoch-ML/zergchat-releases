@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "product": "zergchat-desktop",
+  "channel": "stable",
+  "version": "0.1.15",
+  "release_tag": "zergchat-v0.1.15",
+  "source_repository": "Epoch-ML/zerg",
+  "source_sha": "91885697372cdb4b0d76dd3b7e66c25a6cb6259d",
+  "source_ref": "refs/tags/zergchat-v0.1.15",
+  "requested_at": "2026-10-22T21:56:49.000Z",
+  "updater_public_key_sha256": "72e69951eb2b25e83adb69fa6da6373e842127cdd6d597b4f95e7572dc60d860"
+}
