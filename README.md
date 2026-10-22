@@ -124,10 +124,31 @@ Preview and stable applications embed distinct updater roots:
 - [keys/zergchat-preview-updater.pubkey](keys/zergchat-preview-updater.pubkey), key ID
   **B560202AC690AEF3**
 - [keys/zergchat-stable-updater.pubkey](keys/zergchat-stable-updater.pubkey), key ID
-  **1E62C9A6F112AF0D**
+  **55B88A007E16D659**
 
 The stable feed can therefore never accept an archive signed by the preview
 identity, even if an ad-hoc preview app is otherwise valid.
+
+### First-public-release stable bootstrap
+
+Before any release was published in this repository, the owning human created
+stable key **55B88A007E16D659** for the 0.1.9/0.1.10 bootstrap. Its canonical
+public-file SHA-256 is
+`72e69951eb2b25e83adb69fa6da6373e842127cdd6d597b4f95e7572dc60d860`.
+The previous prepared stable root **1E62C9A6F112AF0D** remains historical; its
+private files have not been replaced. No published tag or artifact was changed.
+Existing private-repository clients through 0.1.8 still need one manual install.
+Both new A/B builds must embed this same new stable root before signing.
+
+The active manual signer uses the encrypted local bootstrap key and the
+Keychain service `org.epochml.zergchat.stable-updater.20261022`; private material
+and the password stay outside this repository. The named GitHub stable updater
+secrets above still contain the previous key configuration and **have not been
+updated**. They cannot publish against this new root until the owning human
+updates both encrypted secrets and verifies an independent signature. Keep the
+release workflow disabled until that separate configuration is complete. A future
+automated source stage must also carry the matching public key; the existing
+byte-for-byte source/root gate remains required.
 
 The private source repository has no desktop-release environment, public
 repository deploy key, or repository-wide release secret. Its tag workflow
