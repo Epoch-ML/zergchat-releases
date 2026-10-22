@@ -1,0 +1,224 @@
+{
+  "schemaVersion": 1,
+  "description": "Sanitized operator observations; platform limits remain part of the result.",
+  "releaseSources": {
+    "0.1.9": "3707e62dac95fa84e55ab3865cb228d451b7130b",
+    "0.1.10": "f33c7ec616fa6d6477e6778e50edff75134a0012"
+  },
+  "stableUpdaterRoot": {
+    "keyId": "55B88A007E16D659",
+    "publicFileSha256": "72e69951eb2b25e83adb69fa6da6373e842127cdd6d597b4f95e7572dc60d860"
+  },
+  "macOS": {
+    "architecture": "arm64",
+    "status": "actual_public_A_to_B_passed",
+    "observedAt": "2026-10-22T18:12:06.141304+00:00",
+    "fromVersion": "0.1.9",
+    "installedVersion": "0.1.10",
+    "installedExecutableSha256": "614b840e07d8ef051800bf7f387d93bb9ae8c23e56e1dd405b26f41138e952de",
+    "productionPluginDownloadInstallRelaunch": true,
+    "manualBinaryCopyAfterUpdate": false,
+    "signedInRetained": true,
+    "activeConversationRetained": true,
+    "conversationContentExported": false,
+    "codeSignaturePassed": true,
+    "gatekeeperNotarizedPassed": true,
+    "notaryStaplePassed": true,
+    "testDriverPresent": false,
+    "intelRuntimeExercised": false
+  },
+  "linux": {
+    "architecture": "x86_64",
+    "status": "passed_with_manual_A_bootstrap",
+    "qualification": "Published 0.1.9 AppImage standard startup failed because selected runtime cannot extract zstd. Its unchanged inner production AppDir/ELF was manually extracted and launched with APPIMAGE pointing to an owned byte-exact original A file. This qualifies production updater/install/relaunch behavior, not ordinary A startup or a normal fresh A install. Published A bytes remain unchanged.",
+    "fromVersion": "0.1.9",
+    "installedVersion": "0.1.10",
+    "fromImageSha256": "cb9d99842199311cfbcc217c68c30ddb4ae68a8f275d1aea93729c9f3c1cf80e",
+    "installedImageSha256": "b86e1a72cd8150bf828b2972a6a233b03bd2700a65f01263c665fa5ebd2498e9",
+    "installedImageBytes": 89089216,
+    "runningExecutableSha256": "87283acfe72d26d26595b1a1835e1f5bcb95da7142a85404d3556ea58ddcbef3",
+    "standardAStartup": "failed_before_application_start",
+    "manualAExtractionBootstrap": true,
+    "realProductionMenuTriggered": true,
+    "productionPluginDownloadInstallRelaunch": true,
+    "harnessInstallationWritesAfterClick": false,
+    "oldProcessExited": true,
+    "standardBFuseLaunch": true,
+    "postUpdateRenderedUi": "passed",
+    "postUpdateScreenshotSha256": "3420418a7c9dac72a11fe6e6efa89945e4ea90e2824fbca387cc21979d402da8",
+    "currentVersionFeedStatus": 204,
+    "currentVersionFeedBodyBytes": 0,
+    "productionLoginPerformed": false,
+    "loggedInStateRetentionClaimed": false,
+    "guest": "Dedicated full Ubuntu22.04 x86_64 QEMU TCG guest",
+    "webKitSandboxEnabled": true,
+    "guestSoftwareGraphicsUsed": true,
+    "ownedTestEnvironmentCleanup": "complete; guest powered off and owned processes/containers stopped; evidence retained"
+  },
+  "windows": {
+    "architecture": "x86_64",
+    "status": "interactive_runtime_and_update_unverified",
+    "installerVersionsAndHashesPassed": true,
+    "updaterSignaturesVerified": true,
+    "authenticodePublisherSignature": false,
+    "limitation": "SYSTEM Session0 and private desktop probes did not initialize the main WebView2; no interactive startup, A-to-B update or fixture negative-case success is claimed."
+  },
+  "hostedFacade": {
+    "sourceCommit": "f742dafc7c439f57fb534da0b629d145f78e3750",
+    "preservedSourceBaseline": "2a74adc0a980fea5fc570b6a1238a7ad98f48230",
+    "schemaVersion": 27,
+    "imageDigest": "sha256:1fa111dd4d7b010266270216b1c13ddc4265af752693ea7ee1632c9301b8aef3",
+    "compareAndSwapPreflight": true,
+    "finalConfigurationChangedOnlyImage": true,
+    "feedChecks": [
+      {
+        "target": "darwin",
+        "arch": "aarch64",
+        "current": "0.1.9",
+        "status": 200,
+        "version": "0.1.10",
+        "url": "https://zergchat.com/api/native/download/666538149/Zergchat_0.1.10_universal.app.tar.gz",
+        "signature_matches_published": true
+      },
+      {
+        "target": "darwin",
+        "arch": "aarch64",
+        "current": "0.1.10",
+        "status": 204
+      },
+      {
+        "target": "darwin",
+        "arch": "x86_64",
+        "current": "0.1.9",
+        "status": 200,
+        "version": "0.1.10",
+        "url": "https://zergchat.com/api/native/download/666538149/Zergchat_0.1.10_universal.app.tar.gz",
+        "signature_matches_published": true
+      },
+      {
+        "target": "darwin",
+        "arch": "x86_64",
+        "current": "0.1.10",
+        "status": 204
+      },
+      {
+        "target": "windows",
+        "arch": "x86_64",
+        "current": "0.1.9",
+        "status": 200,
+        "version": "0.1.10",
+        "url": "https://zergchat.com/api/native/download/666549880/Zergchat_0.1.10_x64-setup.exe",
+        "signature_matches_published": true
+      },
+      {
+        "target": "windows",
+        "arch": "x86_64",
+        "current": "0.1.10",
+        "status": 204
+      },
+      {
+        "target": "linux",
+        "arch": "x86_64",
+        "current": "0.1.9",
+        "status": 200,
+        "version": "0.1.10",
+        "url": "https://zergchat.com/api/native/download/666604394/Zergchat_0.1.10_amd64.AppImage",
+        "signature_matches_published": true
+      },
+      {
+        "target": "linux",
+        "arch": "x86_64",
+        "current": "0.1.10",
+        "status": 204
+      }
+    ],
+    "anonymousDownloadSmokes": {
+      "result": "passed",
+      "count": 12,
+      "fullArtifactHashesIndependentlyVerifiedByTheseSmokes": false,
+      "assets": [
+        {
+          "url": "https://zergchat.com/api/native/download/666539035/app-universal-debug.apk",
+          "status": 206,
+          "bytesReceived": 1024,
+          "publishedSha256": "99bca418be149c8f6b6a07ead9704e794c07749aa222502e28755274030bb219"
+        },
+        {
+          "url": "https://zergchat.com/api/native/download/666571975/Zergchat-0.1.10-1.x86_64.rpm",
+          "status": 206,
+          "bytesReceived": 1024,
+          "publishedSha256": "9df4bd98d9884e2c53eb588f2c84866a12eab2f63eb8e9e1ffadd22870e21daa"
+        },
+        {
+          "url": "https://zergchat.com/api/native/download/666604394/Zergchat_0.1.10_amd64.AppImage",
+          "status": 206,
+          "bytesReceived": 1024,
+          "publishedSha256": "b86e1a72cd8150bf828b2972a6a233b03bd2700a65f01263c665fa5ebd2498e9"
+        },
+        {
+          "url": "https://zergchat.com/api/native/download/666607890/Zergchat_0.1.10_amd64.AppImage.sig",
+          "status": 206,
+          "bytesReceived": 420,
+          "publishedSha256": "54549632faaa8c2a2b1030f5f55b0f6b9d6697c4769869fad1deb713e1cad3d4"
+        },
+        {
+          "url": "https://zergchat.com/api/native/download/666574169/Zergchat_0.1.10_amd64.deb",
+          "status": 206,
+          "bytesReceived": 1024,
+          "publishedSha256": "2946f54e46fbbf7bab7822b4c8480248e00d71323888624bf696b14c12b498d3"
+        },
+        {
+          "url": "https://zergchat.com/api/native/download/666538149/Zergchat_0.1.10_universal.app.tar.gz",
+          "status": 206,
+          "bytesReceived": 1024,
+          "publishedSha256": "00a66468f52010eb80bb14f3804dfd9135f9ee0c1df67705e9936fd61f7e0aca"
+        },
+        {
+          "url": "https://zergchat.com/api/native/download/666538332/Zergchat_0.1.10_universal.app.tar.gz.sig",
+          "status": 206,
+          "bytesReceived": 428,
+          "publishedSha256": "d299274a2dd70158655d07dc139fe6e11e8572a353d610b5cc25706843285206"
+        },
+        {
+          "url": "https://zergchat.com/api/native/download/666538363/Zergchat_0.1.10_universal.dmg",
+          "status": 206,
+          "bytesReceived": 1024,
+          "publishedSha256": "41137cd1fd14bd01d6c8cf9b49a4373594aa9fb8c24a895724d079ed59cbb1e8"
+        },
+        {
+          "url": "https://zergchat.com/api/native/download/666549880/Zergchat_0.1.10_x64-setup.exe",
+          "status": 206,
+          "bytesReceived": 1024,
+          "publishedSha256": "4d4f38384aacb8a3a99767955803ed40d089255b4f519f4ba421658eab4a884b"
+        },
+        {
+          "url": "https://zergchat.com/api/native/download/666550087/Zergchat_0.1.10_x64-setup.exe.sig",
+          "status": 206,
+          "bytesReceived": 420,
+          "publishedSha256": "6225964a37f1f8b60f950145fb42affb402a26339cddfefa034fd6354a6b5a9c"
+        },
+        {
+          "url": "https://zergchat.com/api/native/download/666550195/Zergchat_0.1.10_x64_en-US.msi",
+          "status": 206,
+          "bytesReceived": 1024,
+          "publishedSha256": "2dd6caa5eba214b2bcb7b752678577158be2ca88ef094f4e8d78ea0149cc2f4d"
+        },
+        {
+          "url": "https://zergchat.com/api/native/download/666550503/Zergchat_0.1.10_x64_en-US.msi.sig",
+          "status": 206,
+          "bytesReceived": 420,
+          "publishedSha256": "5b886a1d8340198d49c7155975905c8b4b0ac77da2d150aed15ab5f7b8626624"
+        }
+      ]
+    }
+  },
+  "combinedSourceFollowUp": {
+    "branch": "release/zergchat-desktop-bootstrap-current",
+    "commit": "9e402f67c3f1c3edf9587ececfbe118cfbf36c89",
+    "nativeNodeTestsPassed": 137,
+    "nativePlaywrightTestsPassed": 42,
+    "typecheckPassed": true,
+    "prOpened": false
+  },
+  "publishedArtifactBytesChangedAfterPublication": false
+}

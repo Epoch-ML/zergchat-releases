@@ -11,6 +11,8 @@ application facade and the first-public-release stable bootstrap root below,
 preserves immutable tags, and leaves this repository's macOS-only workflow and
 GitHub Pages feeds unchanged.
 Prepared requests are not evidence of built or published artifacts.
+The [October 22 runtime results](docs/bootstrap-20261022-results.md) record
+published assets, observed updates and platform-specific acceptance limits.
 
 ## Release flow
 
