@@ -17,6 +17,8 @@ The [0.1.11 macOS acceptance](docs/desktop-0.1.11-20261022-results.md) records
 the public update, retained session, unified header and per-platform updater checks.
 The [0.1.12 file-tree acceptance](docs/desktop-0.1.12-20261022-results.md) records
 the nested explorer, private filing, permission checks and public Mac update.
+The [0.1.13 Slack identity acceptance](docs/desktop-0.1.13-20261022-results.md) records
+personal posting consent, message prompts and the public Mac update.
 
 ## Release flow
 
