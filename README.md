@@ -13,6 +13,8 @@ GitHub Pages feeds unchanged.
 Prepared requests are not evidence of built or published artifacts.
 The [October 22 runtime results](docs/bootstrap-20261022-results.md) record
 published assets, observed updates and platform-specific acceptance limits.
+The [0.1.11 macOS acceptance](docs/desktop-0.1.11-20261022-results.md) records
+the public update, retained session, unified header and per-platform updater checks.
 
 ## Release flow
 

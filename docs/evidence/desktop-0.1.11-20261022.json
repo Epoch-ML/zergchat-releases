@@ -1,0 +1,325 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-22T19:49:47.064853+00:00",
+  "release": {
+    "version": "0.1.11",
+    "channel": "stable",
+    "url": "https://github.com/Epoch-ML/zergchat-releases/releases/tag/zergchat-v0.1.11",
+    "releaseId": 421126329,
+    "publishedAt": "2026-10-22T19:46:50Z",
+    "immutable": true,
+    "assetCount": 6,
+    "publicRequestCommit": "f98d4286e6b884123c4799c627b69689e6a5d870",
+    "requestSha256": "63a3d5f4a36fb8bb250070c653f88a09ca4537bf7f3920f5f8c972ecbdb09265",
+    "macosSourceSha": "8ba6d5348e68ecd8f9dda2513dff9002e499340c",
+    "sourceTag": "zergchat-v0.1.11"
+  },
+  "updaterRoot": {
+    "keyId": "55B88A007E16D659",
+    "sha256": "72e69951eb2b25e83adb69fa6da6373e842127cdd6d597b4f95e7572dc60d860",
+    "independentMinisignVerified": true
+  },
+  "releaseAssets": [
+    {
+      "name": "Zergchat_0.1.11_universal.app.tar.gz",
+      "bytes": 12153919,
+      "sha256": "d331ae0b26a9a4e9e32083eecca4f667c94bcbeef60ceecf264bb3d3880669f4",
+      "independentDraftFullDownloadVerified": true
+    },
+    {
+      "name": "Zergchat_0.1.11_universal.app.tar.gz.sig",
+      "bytes": 428,
+      "sha256": "123c0068630dbab091d5ecac0fc6fbec2028c47422fb5ada1d7e93773549b428",
+      "independentDraftFullDownloadVerified": true
+    },
+    {
+      "name": "Zergchat_0.1.11_universal.dmg",
+      "bytes": 13412127,
+      "sha256": "f8fb8157f42636c5d19ef8de9ee79cd025fdd34399516f3e8ff53ed3344f569d",
+      "independentDraftFullDownloadVerified": true
+    },
+    {
+      "name": "checksums-macos.txt",
+      "bytes": 392,
+      "sha256": "9681998b0723109f2f97e33bf0b9e50975bf7097431904d350ce48972f366ae4",
+      "independentDraftFullDownloadVerified": true
+    },
+    {
+      "name": "macos-notarized.txt",
+      "bytes": 164,
+      "sha256": "8f58c28a7581317b96ac450cd24fd3673a2fbfe8570a34b57ce17eb7a98ba47b",
+      "independentDraftFullDownloadVerified": true
+    },
+    {
+      "name": "manual-release-metadata.json",
+      "bytes": 1944,
+      "sha256": "c3199eeaba89a51ab75aaeecbb2d32232627d4b72949e00bf295ccdfbfabef8c",
+      "independentDraftFullDownloadVerified": true
+    }
+  ],
+  "platformVersions": {
+    "macos": "0.1.11",
+    "windows": "0.1.10",
+    "linux": "0.1.10",
+    "androidPilot": "0.1.8 debug APK"
+  },
+  "webDeployment": {
+    "verifiedAt": "2026-10-22T19:46:34.555087+00:00",
+    "sourceSha": "9218947c5c23abb6695f923ae09053b0f6ba993a",
+    "imageDigest": "sha256:b8dbb1c90481b95bd2d972e1caf707affdba12c27847032cb8c3da3ab8283c17",
+    "healthy": true,
+    "schemaApplied": 27,
+    "schemaRequired": 27,
+    "configurationChanges": [
+      "image"
+    ]
+  },
+  "publicMacUpdate": {
+    "verifiedAt": "2026-10-22T19:48:09.812947+00:00",
+    "finalUiVerifiedAt": "2026-10-22T19:48:43.835242+00:00",
+    "fromVersion": "0.1.10",
+    "toVersion": "0.1.11",
+    "normalProductionUpdaterUsed": true,
+    "normalMoreRestartToUpdateClicked": true,
+    "oldProcessExited": true,
+    "automaticRestartObservedBeforeAnyManualLaunch": true,
+    "sameOwnedApplicationCopyPath": true,
+    "binarySha256": "89296f49662481a1dd4d266cb452ce5ed227990404d054bfbfb899044b83348f",
+    "codesignAndGatekeeperPassed": true,
+    "testIpcUsed": false,
+    "signedInWorkspaceRetained": true,
+    "conversationPanesRetained": true,
+    "retainedPaneCount": 2,
+    "routerSignInActionVisible": true,
+    "centeredSearchPresent": true,
+    "unifiedNativeHeaderVerified": true,
+    "profileIsolationClaimed": false,
+    "storageScope": "Application copy shared ordinary Keychain and WebView storage.",
+    "installedApplicationUpdated": false,
+    "installedVersionUnchanged": "0.1.10",
+    "installedBinarySha256Unchanged": "614b840e07d8ef051800bf7f387d93bb9ae8c23e56e1dd405b26f41138e952de",
+    "freshDmgInstallationExercised": false,
+    "newRouterApprovalExercised": false,
+    "chatMessagesSent": false
+  },
+  "liveFacade": {
+    "result": "passed",
+    "anonymous": true,
+    "checks": [
+      {
+        "path": "/api/native/releases",
+        "status": 200,
+        "bytes": 15757,
+        "result": "passed"
+      },
+      {
+        "path": "/downloads",
+        "status": 200,
+        "bytes": 22054,
+        "result": "passed"
+      },
+      {
+        "path": "/api/native/update/stable/darwin/aarch64/0.1.10",
+        "status": 200,
+        "bytes": 2924,
+        "result": "passed",
+        "offeredVersion": "0.1.11",
+        "artifactName": "Zergchat_0.1.11_universal.app.tar.gz",
+        "artifactSha256": "d331ae0b26a9a4e9e32083eecca4f667c94bcbeef60ceecf264bb3d3880669f4",
+        "signatureSha256": "123c0068630dbab091d5ecac0fc6fbec2028c47422fb5ada1d7e93773549b428"
+      },
+      {
+        "path": "/api/native/update/stable/darwin/x86_64/0.1.10",
+        "status": 200,
+        "bytes": 2923,
+        "result": "passed",
+        "offeredVersion": "0.1.11",
+        "artifactName": "Zergchat_0.1.11_universal.app.tar.gz",
+        "artifactSha256": "d331ae0b26a9a4e9e32083eecca4f667c94bcbeef60ceecf264bb3d3880669f4",
+        "signatureSha256": "123c0068630dbab091d5ecac0fc6fbec2028c47422fb5ada1d7e93773549b428"
+      },
+      {
+        "path": "/api/native/update/stable/darwin/aarch64/0.1.11",
+        "status": 204,
+        "bytes": 0,
+        "result": "passed"
+      },
+      {
+        "path": "/api/native/update/stable/darwin/x86_64/0.1.11",
+        "status": 204,
+        "bytes": 0,
+        "result": "passed"
+      },
+      {
+        "path": "/api/native/update/stable/windows/x86_64/0.1.9",
+        "status": 200,
+        "bytes": 1135,
+        "result": "passed",
+        "offeredVersion": "0.1.10",
+        "artifactName": "Zergchat_0.1.10_x64-setup.exe",
+        "artifactSha256": "4d4f38384aacb8a3a99767955803ed40d089255b4f519f4ba421658eab4a884b",
+        "signatureSha256": "6225964a37f1f8b60f950145fb42affb402a26339cddfefa034fd6354a6b5a9c"
+      },
+      {
+        "path": "/api/native/update/stable/linux/x86_64/0.1.9",
+        "status": 200,
+        "bytes": 1135,
+        "result": "passed",
+        "offeredVersion": "0.1.10",
+        "artifactName": "Zergchat_0.1.10_amd64.AppImage",
+        "artifactSha256": "b86e1a72cd8150bf828b2972a6a233b03bd2700a65f01263c665fa5ebd2498e9",
+        "signatureSha256": "54549632faaa8c2a2b1030f5f55b0f6b9d6697c4769869fad1deb713e1cad3d4"
+      },
+      {
+        "path": "/api/native/update/stable/windows/x86_64/0.1.10",
+        "status": 204,
+        "bytes": 0,
+        "result": "passed"
+      },
+      {
+        "path": "/api/native/update/stable/linux/x86_64/0.1.10",
+        "status": 204,
+        "bytes": 0,
+        "result": "passed"
+      },
+      {
+        "path": "/api/version",
+        "status": 200,
+        "bytes": 186,
+        "result": "passed"
+      }
+    ]
+  },
+  "anonymousDownloadSmokes": {
+    "result": "passed",
+    "assetCount": 12,
+    "method": "HTTP byte-range smoke; published digests are metadata, not independently recomputed full hashes in this step.",
+    "assets": [
+      {
+        "url": "https://zergchat.com/api/native/download/666539035/app-universal-debug.apk",
+        "status": 206,
+        "transferredBytes": 1024,
+        "publishedSha256": "99bca418be149c8f6b6a07ead9704e794c07749aa222502e28755274030bb219"
+      },
+      {
+        "url": "https://zergchat.com/api/native/download/666885199/Zergchat_0.1.11_universal.app.tar.gz",
+        "status": 206,
+        "transferredBytes": 1024,
+        "publishedSha256": "d331ae0b26a9a4e9e32083eecca4f667c94bcbeef60ceecf264bb3d3880669f4"
+      },
+      {
+        "url": "https://zergchat.com/api/native/download/666885192/Zergchat_0.1.11_universal.app.tar.gz.sig",
+        "status": 206,
+        "transferredBytes": 428,
+        "publishedSha256": "123c0068630dbab091d5ecac0fc6fbec2028c47422fb5ada1d7e93773549b428"
+      },
+      {
+        "url": "https://zergchat.com/api/native/download/666885190/Zergchat_0.1.11_universal.dmg",
+        "status": 206,
+        "transferredBytes": 1024,
+        "publishedSha256": "f8fb8157f42636c5d19ef8de9ee79cd025fdd34399516f3e8ff53ed3344f569d"
+      },
+      {
+        "url": "https://zergchat.com/api/native/download/666571975/Zergchat-0.1.10-1.x86_64.rpm",
+        "status": 206,
+        "transferredBytes": 1024,
+        "publishedSha256": "9df4bd98d9884e2c53eb588f2c84866a12eab2f63eb8e9e1ffadd22870e21daa"
+      },
+      {
+        "url": "https://zergchat.com/api/native/download/666604394/Zergchat_0.1.10_amd64.AppImage",
+        "status": 206,
+        "transferredBytes": 1024,
+        "publishedSha256": "b86e1a72cd8150bf828b2972a6a233b03bd2700a65f01263c665fa5ebd2498e9"
+      },
+      {
+        "url": "https://zergchat.com/api/native/download/666607890/Zergchat_0.1.10_amd64.AppImage.sig",
+        "status": 206,
+        "transferredBytes": 420,
+        "publishedSha256": "54549632faaa8c2a2b1030f5f55b0f6b9d6697c4769869fad1deb713e1cad3d4"
+      },
+      {
+        "url": "https://zergchat.com/api/native/download/666574169/Zergchat_0.1.10_amd64.deb",
+        "status": 206,
+        "transferredBytes": 1024,
+        "publishedSha256": "2946f54e46fbbf7bab7822b4c8480248e00d71323888624bf696b14c12b498d3"
+      },
+      {
+        "url": "https://zergchat.com/api/native/download/666549880/Zergchat_0.1.10_x64-setup.exe",
+        "status": 206,
+        "transferredBytes": 1024,
+        "publishedSha256": "4d4f38384aacb8a3a99767955803ed40d089255b4f519f4ba421658eab4a884b"
+      },
+      {
+        "url": "https://zergchat.com/api/native/download/666550087/Zergchat_0.1.10_x64-setup.exe.sig",
+        "status": 206,
+        "transferredBytes": 420,
+        "publishedSha256": "6225964a37f1f8b60f950145fb42affb402a26339cddfefa034fd6354a6b5a9c"
+      },
+      {
+        "url": "https://zergchat.com/api/native/download/666550195/Zergchat_0.1.10_x64_en-US.msi",
+        "status": 206,
+        "transferredBytes": 1024,
+        "publishedSha256": "2dd6caa5eba214b2bcb7b752678577158be2ca88ef094f4e8d78ea0149cc2f4d"
+      },
+      {
+        "url": "https://zergchat.com/api/native/download/666550503/Zergchat_0.1.10_x64_en-US.msi.sig",
+        "status": 206,
+        "transferredBytes": 420,
+        "publishedSha256": "5b886a1d8340198d49c7155975905c8b4b0ac77da2d150aed15ab5f7b8626624"
+      }
+    ]
+  },
+  "sourceValidation": {
+    "nodeVersion": "22.23.2",
+    "nativeNodePassed": 137,
+    "nativePlaywrightPassed": 42,
+    "routerUiPassed": 26,
+    "headerBuiltUiPassed": 17,
+    "headerUtilityPassed": 11,
+    "nativePolicyPassed": 2,
+    "nativeAclPassed": 5,
+    "routerAccountBrowserPassed": 7,
+    "typecheck": "passed",
+    "routerSemanticMutantsKilled": 19,
+    "headerStrykerMutantsKilled": 32,
+    "headerEquivalentMutants": 1,
+    "nativePolicySemanticMutantsKilled": 8,
+    "platformFacadePassed": 30,
+    "platformPermutationRuns": 12,
+    "platformSemanticMutantsKilled": 9,
+    "platformSemanticMutantsSurvived": 0,
+    "platformBehavioralRed": {
+      "failed": 3,
+      "expected": "0.1.10",
+      "received": "undefined (public updater returned null)",
+      "subject": "Windows and Linux 0.1.9 update after Mac-only 0.1.11; mixed-platform permutation"
+    },
+    "platformTestOnlyCommit": "29e2b4e566ee0659e69e41ae02d246aeadb6b0b0"
+  },
+  "engineeringQualifications": {
+    "rustClippy": "Passed with two existing dead-code warnings in unchanged files.",
+    "rustFmt": "Failed: 46 files before and after; diff blocks250 before/252 after. No broad formatting applied.",
+    "themeCheck": "Existing FakeidanBotManager.vue --red finding remains."
+  },
+  "limitations": [
+    "The actual update ran on an application copy sharing ordinary Keychain/WebView storage, not an isolated profile.",
+    "The installed application remained at0.1.10; a fresh0.1.11 DMG install was not exercised.",
+    "No new Router sign-in approval or chat message was sent during the native inspection.",
+    "Intel macOS execution was not exercised; the universal bundle and both Mac feed entries were verified.",
+    "Windows and Linux remain existing0.1.10 artifacts; this release adds no new interactive runtime acceptance for them.",
+    "Existing Windows installers have no Authenticode publisher signature.",
+    "Android remains a separately identified debug APK for sideloading."
+  ],
+  "finalUserState": {
+    "installedVersion": "0.1.10",
+    "originalProcessUnchanged": true,
+    "installedBinaryUnchanged": true,
+    "normalRestartToUpdateVisible": true,
+    "offeredVersion": "0.1.11",
+    "updateLeftForUser": true,
+    "updateActionNotClicked": true,
+    "ownedTestInstancesStopped": true,
+    "normalSchemeHandlerRestoredToInstalledApp": true,
+    "broadResetUsed": false
+  }
+}
