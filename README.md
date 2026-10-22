@@ -5,6 +5,13 @@ native ZergChat desktop application. Private source remains in
 **Epoch-ML/zerg**; this repository holds validated release requests, public
 artifacts, independent channel updater public keys, and GitHub Pages feeds.
 
+The [manual three-platform bootstrap](docs/manual-desktop-release.md) prepares
+0.1.9 and 0.1.10 from pinned sources when Actions cannot run. It uses the hosted
+application facade and the first-public-release stable bootstrap root below,
+preserves immutable tags, and leaves this repository's macOS-only workflow and
+GitHub Pages feeds unchanged.
+Prepared requests are not evidence of built or published artifacts.
+
 ## Release flow
 
 1. A protected **zergchat-v\*** or **zergchat-preview-v\*** source tag emits one
