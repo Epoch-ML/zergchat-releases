@@ -1,0 +1,183 @@
+{
+  "version": "0.1.16",
+  "sourceSha": "12339acdc03af32eac06e323616f8633846778d2",
+  "releaseUrl": "https://github.com/Epoch-ML/zergchat-releases/releases/tag/zergchat-v0.1.16",
+  "validation": {
+    "targetedPassed": 96,
+    "fullAppAndViewportPassed": 13,
+    "typecheckPassed": true,
+    "sizingPassed": true,
+    "mutations": {
+      "dmProjection": {
+        "killed": 58,
+        "survived": 0
+      },
+      "knowledgeProjection": {
+        "killed": 41,
+        "survived": 0
+      },
+      "childSafety": {
+        "killed": 61,
+        "timeoutCycleGuard": 1,
+        "survived": 0
+      },
+      "sidebarProjection": {
+        "killed": 184,
+        "survivedEquivalentForCanonicalSnapshots": 9,
+        "total": 193
+      }
+    },
+    "knownBaselineFailures": {
+      "expandedThreadSuite": 5,
+      "themeChecker": "existing FakeidanBotManager --red token"
+    }
+  },
+  "native": {
+    "binarySha256": "0623cccf4f0000263cab30109784c820534e427e7714de11eef3d7a6fd624452",
+    "updaterPublicKeySha256": "72e69951eb2b25e83adb69fa6da6373e842127cdd6d597b4f95e7572dc60d860",
+    "universalArchitectures": [
+      "arm64",
+      "x86_64"
+    ],
+    "appNotarization": "Accepted",
+    "dmgNotarization": "Accepted",
+    "gatekeeperAndStaplePassed": true,
+    "testFeaturesEnabled": false
+  },
+  "artifacts": [
+    {
+      "name": "Zergchat_0.1.16_universal.dmg",
+      "sha256": "846687f9a60e34adaefae6d9e1b1cbbe7fed2231a2fd761053615d05d0a3fd01",
+      "bytes": 16831218
+    },
+    {
+      "name": "macos-notarized.txt",
+      "sha256": "b911e0a239e0a2d698c524ee7ac58e624dda594a8317dbf843f1413675b777f5",
+      "bytes": 164
+    },
+    {
+      "name": "manual-release-metadata.json",
+      "sha256": "89c695b614a85033f5c5fd644b76a2a1d70bfffa70200cc817060eab43ecad23",
+      "bytes": 1944
+    },
+    {
+      "name": "Zergchat_0.1.16_universal.app.tar.gz.sig",
+      "sha256": "5e3deb6cb29507f6e7d65ce7bfe9d4288014ac62e9952b69140627ad719c8828",
+      "bytes": 428
+    },
+    {
+      "name": "checksums-macos.txt",
+      "sha256": "031230b4fef74ef1677a667caadfd681b4e8cee9bf9d320d708054b431978595",
+      "bytes": 392
+    },
+    {
+      "name": "Zergchat_0.1.16_universal.app.tar.gz",
+      "sha256": "6f74cc38a695bcdd6c49787b5b3207c7c7e9e5aa994f2309d104910c79a4c622",
+      "bytes": 15471596
+    }
+  ],
+  "draftAssetsIndependentlyVerified": 6,
+  "anonymousPublicAssetsVerified": 6,
+  "hostedDmg": {
+    "sha256": "846687f9a60e34adaefae6d9e1b1cbbe7fed2231a2fd761053615d05d0a3fd01",
+    "bytes": 16831218,
+    "assetId": 667417204,
+    "downloadsPageVersion": "0.1.16"
+  },
+  "updaterChecks": [
+    {
+      "platform": "darwin",
+      "arch": "aarch64",
+      "from": "0.1.15",
+      "status": 200,
+      "version": "0.1.16"
+    },
+    {
+      "platform": "darwin",
+      "arch": "aarch64",
+      "from": "0.1.16",
+      "status": 204,
+      "version": null
+    },
+    {
+      "platform": "darwin",
+      "arch": "x86_64",
+      "from": "0.1.15",
+      "status": 200,
+      "version": "0.1.16"
+    },
+    {
+      "platform": "darwin",
+      "arch": "x86_64",
+      "from": "0.1.16",
+      "status": 204,
+      "version": null
+    },
+    {
+      "platform": "windows",
+      "arch": "x86_64",
+      "from": "0.1.9",
+      "status": 200,
+      "version": "0.1.10"
+    },
+    {
+      "platform": "windows",
+      "arch": "x86_64",
+      "from": "0.1.10",
+      "status": 204,
+      "version": null
+    },
+    {
+      "platform": "linux",
+      "arch": "x86_64",
+      "from": "0.1.9",
+      "status": 200,
+      "version": "0.1.10"
+    },
+    {
+      "platform": "linux",
+      "arch": "x86_64",
+      "from": "0.1.10",
+      "status": 204,
+      "version": null
+    }
+  ],
+  "actualUpdate": {
+    "from": "0.1.15",
+    "to": "0.1.16",
+    "ordinaryRestartAction": true,
+    "automaticRestartBeforeManualLaunch": true,
+    "nativeBinarySha256": "0623cccf4f0000263cab30109784c820534e427e7714de11eef3d7a6fd624452",
+    "signedAndStapled": true,
+    "signedInAfterRestart": true,
+    "openPaneCountBefore": 1,
+    "openPaneCountAfter": 1,
+    "sameOpenPanes": true,
+    "staleUpdateOfferAbsent": true,
+    "archiveSectionVisible": true,
+    "participantBadgesVisible": true,
+    "genericConversationButtonsAbsent": true,
+    "storageIsolation": "separate signed app copy; ordinary shared Keychain/WebView profile"
+  },
+  "web": {
+    "sourceSha": "12339acdc03af32eac06e323616f8633846778d2",
+    "buildVersion": "desktop-0.1.16-12339acdc03a",
+    "imageDigest": "sha256:90b1f8d13b932a900ff967d38f72a1d8e4b1ed3393d923c225fc9855a7d065f3",
+    "healthy": true,
+    "schema": 27,
+    "deploymentDelta": "image only"
+  },
+  "cleanup": {
+    "ownedTrialStopped": true,
+    "installedAppUnchanged": true,
+    "installedVersion": "0.1.15",
+    "installedHandlerRestored": true,
+    "realSlackMessagesSent": 0
+  },
+  "buildMode": "manual; no Actions build or workflow changes",
+  "retainedPlatforms": {
+    "windows": "0.1.10",
+    "linux": "0.1.10",
+    "android": "0.1.8"
+  }
+}
