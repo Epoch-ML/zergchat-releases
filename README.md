@@ -21,6 +21,8 @@ The [0.1.13 Slack identity acceptance](docs/desktop-0.1.13-20261022-results.md) 
 personal posting consent, message prompts and the public Mac update.
 The [0.1.14 composer acceptance](docs/desktop-0.1.14-20261022-results.md) records
 the unified writing area, responsive controls and retained-session Mac update.
+The [0.1.15 icon acceptance](docs/desktop-0.1.15-20261022-results.md) records
+full-resolution artwork, native Finder rendering and the retained-session Mac update.
 
 ## Release flow
 

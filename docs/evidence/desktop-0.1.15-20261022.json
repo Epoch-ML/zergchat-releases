@@ -1,0 +1,233 @@
+{
+  "version": "0.1.15",
+  "sourceSha": "91885697372cdb4b0d76dd3b7e66c25a6cb6259d",
+  "recordedAt": "2026-10-22T22:08:45.796327+00:00",
+  "publicReleaseId": "RE_kwDOTzD1-84ZG7S4",
+  "publishedAt": "2026-10-22T22:01:26Z",
+  "assets": [
+    {
+      "name": "Zergchat_0.1.15_universal.dmg",
+      "sha256": "ee3c55ea8f3c69565ccca9c1a814574537cc4c8593115e604769e8617345c41c",
+      "bytes": 16776287
+    },
+    {
+      "name": "macos-notarized.txt",
+      "sha256": "9f61408597184af9c0d3b9dd93dd72caf52d94919480c7136560ec2bf1ca91e8",
+      "bytes": 164
+    },
+    {
+      "name": "manual-release-metadata.json",
+      "sha256": "09c124088aedf8988052f65b58904dec135a76c4379c09f24f58f17e9283a088",
+      "bytes": 1944
+    },
+    {
+      "name": "Zergchat_0.1.15_universal.app.tar.gz",
+      "sha256": "6481f2fbaaffe25d0d23a7159dbc86759c99c20f9d202cd5ed33440e40e41926",
+      "bytes": 15451402
+    },
+    {
+      "name": "checksums-macos.txt",
+      "sha256": "366b993436cfd5a20d6619a1b5c9ec7f245703a954041d38fcddb2598f103a31",
+      "bytes": 392
+    },
+    {
+      "name": "Zergchat_0.1.15_universal.app.tar.gz.sig",
+      "sha256": "cafbe32b612499548025d3bb3e574cf9edc099dd9e8c58a29ff9f64241276351",
+      "bytes": 428
+    }
+  ],
+  "stableSignatureValid": true,
+  "facadeDmgSha256": "ee3c55ea8f3c69565ccca9c1a814574537cc4c8593115e604769e8617345c41c",
+  "updaterChecks": [
+    {
+      "platform": "darwin",
+      "arch": "aarch64",
+      "from": "0.1.14",
+      "status": 200,
+      "version": "0.1.15"
+    },
+    {
+      "platform": "darwin",
+      "arch": "aarch64",
+      "from": "0.1.15",
+      "status": 204,
+      "version": null
+    },
+    {
+      "platform": "darwin",
+      "arch": "x86_64",
+      "from": "0.1.14",
+      "status": 200,
+      "version": "0.1.15"
+    },
+    {
+      "platform": "darwin",
+      "arch": "x86_64",
+      "from": "0.1.15",
+      "status": 204,
+      "version": null
+    },
+    {
+      "platform": "windows",
+      "arch": "x86_64",
+      "from": "0.1.9",
+      "status": 200,
+      "version": "0.1.10"
+    },
+    {
+      "platform": "windows",
+      "arch": "x86_64",
+      "from": "0.1.10",
+      "status": 204,
+      "version": null
+    },
+    {
+      "platform": "linux",
+      "arch": "x86_64",
+      "from": "0.1.9",
+      "status": 200,
+      "version": "0.1.10"
+    },
+    {
+      "platform": "linux",
+      "arch": "x86_64",
+      "from": "0.1.10",
+      "status": 204,
+      "version": null
+    }
+  ],
+  "installed010UpdaterOffers015BothArchitectures": true,
+  "notarization": {
+    "app": "Accepted",
+    "dmg": "Accepted"
+  },
+  "nativeBinarySha256": "43ee5f3b767f09bb908a78203faf6a2db29e62c385f25354a7d897ded02f7518",
+  "runtimeUpdate": {
+    "from": "0.1.14",
+    "to": "0.1.15",
+    "ordinaryRestartAction": true,
+    "automaticRestartBeforeManualLaunch": true,
+    "nativeBinarySha256": "43ee5f3b767f09bb908a78203faf6a2db29e62c385f25354a7d897ded02f7518",
+    "signedAndStapled": true,
+    "workspaceRetained": true,
+    "signedIn": true,
+    "samePanes": true,
+    "paneCount": 2,
+    "staleUpdateOffer": false,
+    "finderIconVisuallyInspected": true,
+    "finderIconRenderSha256": "5da456c5450a83c9d4991d32051a99046dfd19e2e23c029da1c1927f44b2b373",
+    "profileIsolation": "Shared ordinary Keychain and WebView profile"
+  },
+  "icon": {
+    "version": "0.1.15",
+    "bundledIconMatchesSource": true,
+    "icnsSha256": "04e434bf77686bd873bbfb4c03c739b3523ac1f54603ed05e07fd03931bce5ea",
+    "pngLayers": [
+      [
+        64,
+        64
+      ],
+      [
+        512,
+        512
+      ],
+      [
+        32,
+        32
+      ],
+      [
+        256,
+        256
+      ],
+      [
+        512,
+        512
+      ],
+      [
+        1024,
+        1024
+      ],
+      [
+        128,
+        128
+      ],
+      [
+        256,
+        256
+      ]
+    ],
+    "menuBarUsesSeparateTemplate": true
+  },
+  "sourceQualification": {
+    "sourceSha": "91885697372cdb4b0d76dd3b7e66c25a6cb6259d",
+    "typecheckPassed": true,
+    "existingReleaseDownloadTestsPassed": 10,
+    "icnsLayersThrough1024Verified": true,
+    "icoSizesVerified": [
+      16,
+      24,
+      32,
+      48,
+      64,
+      256
+    ],
+    "opaqueRGBExportsVerified": 21,
+    "smallIconVisualReviewPassed": true,
+    "trayMonochromeTransparent": true,
+    "existingCoverageReusedForVisualOnlyChange": true,
+    "newBehaviorTestsAdded": false,
+    "mutationTestsRun": false
+  },
+  "web": {
+    "sourceSha": "91885697372cdb4b0d76dd3b7e66c25a6cb6259d",
+    "build": "desktop-0.1.15-91885697372c",
+    "schema": 27,
+    "healthy": true,
+    "deploymentDelta": "Image only",
+    "publicAssetsVerified": [
+      {
+        "name": "icon-192.png",
+        "sha256": "d969f4dd1ed9f4d327f3673233c5a360f40842de3f4d47b74c6de602258a0f2e"
+      },
+      {
+        "name": "icon-512.png",
+        "sha256": "b396702af89c6821513b4700616bcda32c32912af3e490f2ee31072fa34f1942"
+      },
+      {
+        "name": "icon-maskable-192.png",
+        "sha256": "3337aeb8ab4946979d29da0218c5ba305d9916b929e3d07c28b47ef2cd96a818"
+      },
+      {
+        "name": "icon-maskable-512.png",
+        "sha256": "92fe18548f8aa08f823bdc0fe66a7faf2a1aabcbc1af418c3da57279a58debb6"
+      },
+      {
+        "name": "apple-touch-icon.png",
+        "sha256": "405f061fd60d667bcd942e1fc9243e774411a739e1e134d63269971c5e7d3f56"
+      },
+      {
+        "name": "favicon.svg",
+        "sha256": "3ffab3411859fc2040f75596d0b8fced57ccbd558fc324fe0daaa9ef52a01a48"
+      },
+      {
+        "name": "sw.js",
+        "sha256": "e3236753af6349137006ae52ed25d7fdf3044c412c7810bce894f0b63a2fbf6c"
+      }
+    ]
+  },
+  "cleanup": {
+    "ownedAppStopped": true,
+    "installedAppUnchanged": true,
+    "installedVersion": "0.1.10",
+    "installedUpdateOfferFor015Visible": true,
+    "installedAppUrlHandlerRestored": true
+  },
+  "platforms": {
+    "macos": "0.1.15",
+    "windows": "0.1.10",
+    "linux": "0.1.10",
+    "androidPilot": "0.1.8"
+  },
+  "noRealSlackMessagesSent": true,
+  "actionsBuildUsed": false
+}
