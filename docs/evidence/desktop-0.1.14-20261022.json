@@ -1,0 +1,151 @@
+{
+  "version": "0.1.14",
+  "sourceSha": "ccc2e7f6267eb31d46446b2eb675a71cefc3b5f1",
+  "recordedAt": "2026-10-22T21:46:28.324656+00:00",
+  "publicReleaseId": "RE_kwDOTzD1-84ZG31k",
+  "publishedAt": "2026-10-22T21:42:17Z",
+  "assets": [
+    {
+      "name": "Zergchat_0.1.14_universal.app.tar.gz",
+      "sha256": "8483095362302985a3c71c9484a986de09b9826d96d3b9f17938b61d56a2875d",
+      "bytes": 12163215
+    },
+    {
+      "name": "macos-notarized.txt",
+      "sha256": "d43b6d4b51d827a62ad7e6a0de3b8599fbe7824da316d1a99ed60a90163ffe9c",
+      "bytes": 164
+    },
+    {
+      "name": "manual-release-metadata.json",
+      "sha256": "07d683716859aa648eb551d6a566b0c0a75c3aca2aca8c453b42817c7d8c6dcc",
+      "bytes": 1944
+    },
+    {
+      "name": "checksums-macos.txt",
+      "sha256": "e0c15d3698d822c446187c2a86de6f8002a7c850883ca7dde6eba6e4ba876c0d",
+      "bytes": 392
+    },
+    {
+      "name": "Zergchat_0.1.14_universal.app.tar.gz.sig",
+      "sha256": "cd9fbf47b60d241a37be483e75650cfca30b2b6780da6ee8c03f8b1988cb7f49",
+      "bytes": 428
+    },
+    {
+      "name": "Zergchat_0.1.14_universal.dmg",
+      "sha256": "52fed82712fa0855ab8a3f4365c72a62ff402c30091c55175dfe01e131699bb7",
+      "bytes": 13419950
+    }
+  ],
+  "stableSignatureValid": true,
+  "facadeDmgSha256": "52fed82712fa0855ab8a3f4365c72a62ff402c30091c55175dfe01e131699bb7",
+  "updaterChecks": [
+    {
+      "platform": "darwin",
+      "arch": "aarch64",
+      "from": "0.1.13",
+      "status": 200,
+      "version": "0.1.14"
+    },
+    {
+      "platform": "darwin",
+      "arch": "aarch64",
+      "from": "0.1.14",
+      "status": 204,
+      "version": null
+    },
+    {
+      "platform": "darwin",
+      "arch": "x86_64",
+      "from": "0.1.13",
+      "status": 200,
+      "version": "0.1.14"
+    },
+    {
+      "platform": "darwin",
+      "arch": "x86_64",
+      "from": "0.1.14",
+      "status": 204,
+      "version": null
+    },
+    {
+      "platform": "windows",
+      "arch": "x86_64",
+      "from": "0.1.9",
+      "status": 200,
+      "version": "0.1.10"
+    },
+    {
+      "platform": "windows",
+      "arch": "x86_64",
+      "from": "0.1.10",
+      "status": 204,
+      "version": null
+    },
+    {
+      "platform": "linux",
+      "arch": "x86_64",
+      "from": "0.1.9",
+      "status": 200,
+      "version": "0.1.10"
+    },
+    {
+      "platform": "linux",
+      "arch": "x86_64",
+      "from": "0.1.10",
+      "status": 204,
+      "version": null
+    }
+  ],
+  "installed010UpdaterOffers014BothArchitectures": true,
+  "notarization": {
+    "app": "Accepted",
+    "dmg": "Accepted"
+  },
+  "nativeBinarySha256": "39b11a842ec404f1f8808724ac5976a13b927b4529786e168d5287f14d5911ae",
+  "runtimeUpdate": {
+    "from": "0.1.13",
+    "to": "0.1.14",
+    "ordinaryRestartAction": true,
+    "automaticRestartBeforeAnyManualLaunch": true,
+    "signedIn": true,
+    "sameTwoPanes": true,
+    "newComposerGroups": 2,
+    "newComposerVisuallyInspected": true,
+    "staleUpdateOffer": false,
+    "profileIsolation": "Shared ordinary Keychain and WebView profile"
+  },
+  "sourceQualification": {
+    "composerE2ePassed": 39,
+    "testedSource": "0dcc3f1ef2ae743b2acec4e472945e244f976919",
+    "subsequentDelta": "One unused canonical CSS breakpoint registry declaration",
+    "typecheckPassed": true,
+    "sizingPassed": true,
+    "lightDarkVisualReviewPassed": true,
+    "minimumDockPaneWidthVerified": 260,
+    "minimumPaneControlsAndEmojiContained": true,
+    "existingCoverageReusedForVisualOnlyChange": true
+  },
+  "web": {
+    "sourceSha": "ccc2e7f6267eb31d46446b2eb675a71cefc3b5f1",
+    "build": "desktop-0.1.14-ccc2e7f6267e",
+    "schema": 27,
+    "healthy": true,
+    "deploymentDelta": "Image only"
+  },
+  "cleanup": {
+    "ownedAppStopped": true,
+    "localPreviewStopped": true,
+    "installedAppUnchanged": true,
+    "installedVersion": "0.1.10",
+    "installedUpdateOfferFor014Visible": true,
+    "installedAppUrlHandlerRestored": true
+  },
+  "platforms": {
+    "macos": "0.1.14",
+    "windows": "0.1.10",
+    "linux": "0.1.10",
+    "androidPilot": "0.1.8"
+  },
+  "noRealSlackMessagesSent": true,
+  "actionsBuildUsed": false
+}

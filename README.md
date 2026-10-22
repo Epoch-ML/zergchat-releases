@@ -19,6 +19,8 @@ The [0.1.12 file-tree acceptance](docs/desktop-0.1.12-20261022-results.md) recor
 the nested explorer, private filing, permission checks and public Mac update.
 The [0.1.13 Slack identity acceptance](docs/desktop-0.1.13-20261022-results.md) records
 personal posting consent, message prompts and the public Mac update.
+The [0.1.14 composer acceptance](docs/desktop-0.1.14-20261022-results.md) records
+the unified writing area, responsive controls and retained-session Mac update.
 
 ## Release flow
 
