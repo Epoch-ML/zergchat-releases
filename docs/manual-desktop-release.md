@@ -44,13 +44,13 @@ The active manual signer uses the encrypted key under the local
 `stable-bootstrap-20261022` release-key directory and the Keychain service
 `org.epochml.zergchat.stable-updater.20261022`. Never print or export that
 password. Both A and B must embed the new public root and verify against it.
-The existing GitHub `zergchat-stable-updater` environment still holds the old
-key configuration; no GitHub secret was updated by this preparation. Its
-workflow must stay disabled until the owning human replaces both encrypted
-signing secrets and independently verifies the new key. A future automated
+The owning operator has updated both existing protected GitHub
+`zergchat-stable-updater` environment secrets to this encrypted bootstrap key
+and password. No reviewer, permission or workflow setting changed. The release
+workflow remains manually disabled for this manual run. A future automated
 source stage must also satisfy the unchanged byte-for-byte public-key gate.
-A missing manual
-signing credential still stops publication; it never permits unsigned bytes.
+A missing manual signing credential still stops publication; it never permits
+unsigned bytes.
 
 ## Build and collect each version
 
@@ -157,8 +157,11 @@ ZERGCHAT_NATIVE_RELEASE_REPO=Epoch-ML/zergchat-releases
 ZERGCHAT_NATIVE_STABLE_TAG_PREFIX=zergchat-v
 ```
 
-The public repository needs no private release-read credential. Do not print,
-copy or rotate an existing token as part of this non-secret configuration
+The public repository needs no private release-read credential. The current
+repository setting is stored as a Fly secret: the coordinated publication must
+update that existing secret, not merely add a machine environment override.
+Preserve the running image, resource settings and topology. Do not print, copy
+or rotate an existing read token as part of this non-secret configuration
 change. The facade caches metadata for 60 seconds by default. It exposes only
 digest-verified app-owned download URLs and requires signatures for updater
 offers. Check `/downloads`, `/api/native/releases` and the update endpoints.

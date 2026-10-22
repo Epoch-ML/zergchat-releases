@@ -149,13 +149,12 @@ Both new A/B builds must embed this same new stable root before signing.
 
 The active manual signer uses the encrypted local bootstrap key and the
 Keychain service `org.epochml.zergchat.stable-updater.20261022`; private material
-and the password stay outside this repository. The named GitHub stable updater
-secrets above still contain the previous key configuration and **have not been
-updated**. They cannot publish against this new root until the owning human
-updates both encrypted secrets and verifies an independent signature. Keep the
-release workflow disabled until that separate configuration is complete. A future
-automated source stage must also carry the matching public key; the existing
-byte-for-byte source/root gate remains required.
+and the password stay outside this repository. The owning operator has updated
+both existing **zergchat-stable-updater** GitHub environment secrets to the new
+encrypted key and password. Reviewers, permissions and workflow settings remain
+unchanged. The release workflow remains manually disabled for this manual run.
+A future automated source stage must also carry the matching public key; the
+existing byte-for-byte source/root gate remains required.
 
 The private source repository has no desktop-release environment, public
 repository deploy key, or repository-wide release secret. Its tag workflow
