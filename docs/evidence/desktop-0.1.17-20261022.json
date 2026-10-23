@@ -1,0 +1,243 @@
+{
+  "draft": false,
+  "acceptanceStatus": "COMPLETE_WITH_RECORDED_NATIVE_IMAGE_INTERACTION_LIMIT",
+  "version": "0.1.17",
+  "sourceSha": "1ba8b1d6d6882180aaba0c94a3e76d01a7b43fe5",
+  "releaseUrl": "https://github.com/Epoch-ML/zergchat-releases/releases/tag/zergchat-v0.1.17",
+  "releaseUrlStatus": "PUBLIC",
+  "validation": {
+    "totalPassed": 71,
+    "targetedPassed": 51,
+    "targetedBreakdown": {
+      "composerUploadQueue": 31,
+      "uploadTransport": 20
+    },
+    "fullAppAndViewportPassed": 20,
+    "fullAppAndViewportBreakdown": {
+      "uploadPreview": 6,
+      "artifactImages": 3,
+      "composerDestinations": 9,
+      "composerFormatting": 1,
+      "scheduledMessageReceipts": 1
+    },
+    "typecheckPassed": true,
+    "sizingPassed": true,
+    "productionBuildPassed": true,
+    "productionBuildKind": "Nuxt server",
+    "fullApplicationSuiteClaimedGreen": false,
+    "mutations": {
+      "composerUploadQueue": {
+        "killed": 120,
+        "survivedEquivalent": 8,
+        "total": 128,
+        "timeouts": 0,
+        "errors": 0
+      },
+      "uploadTransport": {
+        "killed": 70,
+        "survivedClassified": 22,
+        "total": 92,
+        "timeouts": 0,
+        "errors": 0
+      },
+      "invalidInitialTransportCampaignExcluded": true
+    },
+    "knownBaselineFailures": {
+      "themeChecker": "existing FakeidanBotManager.vue:282 --red token",
+      "themeFailureUnchanged": true
+    },
+    "realSlackMessagesSentByCompletedTests": 0,
+    "attachFileChooserBrowserDiagnosticPassed": true,
+    "physicalMobileDeviceAcceptance": false
+  },
+  "native": {
+    "status": "VERIFIED",
+    "binarySha256": "36751e01a968b6e486be5c7761680b4a8ffeb7151e02e75deee68b852c61e03a",
+    "updaterPublicKeySha256": "72e69951eb2b25e83adb69fa6da6373e842127cdd6d597b4f95e7572dc60d860",
+    "targetArchitectures": [
+      "arm64",
+      "x86_64"
+    ],
+    "verifiedUniversalArchitectures": [
+      "arm64",
+      "x86_64"
+    ],
+    "appSigningPassed": true,
+    "dmgSigningPassed": true,
+    "exactEntitlementsPassed": true,
+    "appNotarization": "Accepted",
+    "dmgNotarization": "Accepted",
+    "gatekeeperAndStaplePassed": true,
+    "archiveExtractionPassed": true,
+    "stableUpdaterSignaturePassed": true,
+    "testFeaturesEnabled": false
+  },
+  "artifacts": [
+    {
+      "name": "Zergchat_0.1.17_universal.app.tar.gz.sig",
+      "sha256": "d1d4658567ff8e7ccba7561c6acdf1417a389d7d926283d0ef5cf62fc7f8b205",
+      "bytes": 428
+    },
+    {
+      "name": "macos-notarized.txt",
+      "sha256": "8f4a8ecdf925e58b439f6617e653ca692a76114c0a2ee8792bfa2b48c6fbdbef",
+      "bytes": 164
+    },
+    {
+      "name": "manual-release-metadata.json",
+      "sha256": "f33b8c2a943a58ccc6b5f0683901f372db364381aa1114984b28a4284cd5dbea",
+      "bytes": 1944
+    },
+    {
+      "name": "checksums-macos.txt",
+      "sha256": "3123e14a89031139f7789ba70c4671e0e4e3ad4d62f83a0071ba8643d7af699a",
+      "bytes": 392
+    },
+    {
+      "name": "Zergchat_0.1.17_universal.dmg",
+      "sha256": "484d506b55b99a5f6367b938ed4501bb1dde7d9028d2dec6311622ab0f4fba0b",
+      "bytes": 16829143
+    },
+    {
+      "name": "Zergchat_0.1.17_universal.app.tar.gz",
+      "sha256": "69a6d079cfeb1759540fc6c09d8841f916dde00e84925fab9a6d6ade26866761",
+      "bytes": 15472826
+    }
+  ],
+  "artifactsStatus": "INDEPENDENT_DRAFT_AND_ANONYMOUS_PUBLIC_HASHES_VERIFIED",
+  "draftAssetsIndependentlyVerified": 6,
+  "anonymousPublicAssetsVerified": 6,
+  "hostedDmg": {
+    "status": "FULL_DOWNLOAD_HASH_VERIFIED",
+    "sha256": "484d506b55b99a5f6367b938ed4501bb1dde7d9028d2dec6311622ab0f4fba0b",
+    "bytes": 16829143,
+    "assetId": 667464708,
+    "downloadsPageVersion": "0.1.17"
+  },
+  "updaterChecks": [
+    {
+      "platform": "darwin",
+      "arch": "aarch64",
+      "from": "0.1.16",
+      "status": 200,
+      "version": "0.1.17"
+    },
+    {
+      "platform": "darwin",
+      "arch": "aarch64",
+      "from": "0.1.17",
+      "status": 204,
+      "version": null
+    },
+    {
+      "platform": "darwin",
+      "arch": "x86_64",
+      "from": "0.1.16",
+      "status": 200,
+      "version": "0.1.17"
+    },
+    {
+      "platform": "darwin",
+      "arch": "x86_64",
+      "from": "0.1.17",
+      "status": 204,
+      "version": null
+    },
+    {
+      "platform": "windows",
+      "arch": "x86_64",
+      "from": "0.1.9",
+      "status": 200,
+      "version": "0.1.10"
+    },
+    {
+      "platform": "windows",
+      "arch": "x86_64",
+      "from": "0.1.10",
+      "status": 204,
+      "version": null
+    },
+    {
+      "platform": "linux",
+      "arch": "x86_64",
+      "from": "0.1.9",
+      "status": 200,
+      "version": "0.1.10"
+    },
+    {
+      "platform": "linux",
+      "arch": "x86_64",
+      "from": "0.1.10",
+      "status": 204,
+      "version": null
+    },
+    {
+      "platform": "darwin",
+      "arch": "aarch64",
+      "from": "0.1.15",
+      "status": 200,
+      "version": "0.1.17"
+    }
+  ],
+  "actualUpdate": {
+    "from": "0.1.16",
+    "to": "0.1.17",
+    "ordinaryRestartAction": true,
+    "automaticRestartBeforeManualLaunch": true,
+    "nativeBinarySha256": "36751e01a968b6e486be5c7761680b4a8ffeb7151e02e75deee68b852c61e03a",
+    "signedAndStapled": true,
+    "signedInAfterRestart": true,
+    "openPaneCountBefore": 1,
+    "openPaneCountAfter": 1,
+    "sameOpenPanes": true,
+    "staleUpdateOfferAbsent": true,
+    "scratchDraftEmpty": true,
+    "originalConversationRestored": true,
+    "realSlackMessagesSent": 0,
+    "localImagePreviewVerified": false,
+    "nativePreviewQualification": "The controlled Chromium paste checks passed; native OS image-clipboard/file-picker interaction was not qualified through CUA. No file was uploaded or message sent in the native attempt.",
+    "storageIsolation": "Separate signed application copy; ordinary shared Keychain/WebView storage.",
+    "status": "AUTOMATIC_RESTART_VERIFIED"
+  },
+  "web": {
+    "status": "VERIFIED",
+    "sourceSha": "1ba8b1d6d6882180aaba0c94a3e76d01a7b43fe5",
+    "buildVersion": "desktop-0.1.17-1ba8b1d6d688",
+    "imageDigest": "sha256:e2b443de580d9ad499309efeaec99341437f8f89f9ef40156a678017bdf275b0",
+    "healthy": true,
+    "schema": {
+      "ready": true,
+      "appliedVersion": 27,
+      "requiredVersion": 27
+    },
+    "deploymentDelta": "config.image only"
+  },
+  "cleanup": {
+    "status": "VERIFIED",
+    "ownedTrialStopped": true,
+    "installedAppUnchanged": true,
+    "installedVersion": "0.1.15",
+    "installedHandlerRestored": true,
+    "ordinaryUpdateOfferPreserved": true,
+    "realSlackMessagesSent": 0
+  },
+  "buildMode": "Manual signed/notarized macOS and web builds; no Actions build or workflow change used.",
+  "rebuiltPlatforms": [
+    "macos"
+  ],
+  "retainedPlatforms": {
+    "windows": "0.1.10",
+    "linux": "0.1.10",
+    "android": "0.1.8"
+  },
+  "unverifiedPlatformAcceptance": [
+    "Intel execution",
+    "new Windows package",
+    "new Linux package",
+    "new mobile package",
+    "physical mobile device",
+    "fresh drag-to-Applications installation",
+    "native OS image clipboard and file-picker interaction via CUA"
+  ],
+  "evidencePolicy": "Public hashes, counts, booleans and release metadata only; no private paths, conversation content, member/workspace identifiers or process identifiers."
+}
