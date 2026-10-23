@@ -1,0 +1,232 @@
+{
+  "draft": false,
+  "acceptanceStatus": "COMPLETE",
+  "version": "0.1.20",
+  "nativeSourceSha": "c32ef569705026159d505641578a2a877bbcaef2",
+  "hostedRuntimeSourceSha": "bcfa5885fd1c8174870b282a997cbce12a3284c3",
+  "publicRequestCommit": "ece02c0233ac1d9a2d4321f8b0c80a76c8512e8a",
+  "releaseUrl": "https://github.com/Epoch-ML/zergchat-releases/releases/tag/zergchat-v0.1.20",
+  "releaseId": 421570356,
+  "publishedAt": "2026-10-23T08:25:37Z",
+  "evidenceCompiledAt": "2026-10-23T08:37:14Z",
+  "native": {
+    "status": "VERIFIED",
+    "binarySha256": "a4d135a9a1e89bae961831c8f2123c56c11fb473b629af10056760eacb903558",
+    "packagedArchitectures": [
+      "arm64",
+      "x86_64"
+    ],
+    "appSigningPassed": true,
+    "dmgSigningPassed": true,
+    "exactEntitlementsPassed": true,
+    "appNotarization": "Accepted",
+    "dmgNotarization": "Accepted",
+    "gatekeeperAndStaplePassed": true,
+    "archiveExtractionPassed": true,
+    "stableUpdaterSignaturePassed": true,
+    "updaterPublicKeySha256": "72e69951eb2b25e83adb69fa6da6373e842127cdd6d597b4f95e7572dc60d860",
+    "testFeaturesEnabled": false
+  },
+  "artifacts": [
+    {
+      "name": "Zergchat_0.1.20_universal.app.tar.gz",
+      "id": 668379138,
+      "bytes": 15471517,
+      "sha256": "3da64677dc51eb08fa2fcacb952fa82ec8e8c32354d6545feec21836e25c5099"
+    },
+    {
+      "name": "Zergchat_0.1.20_universal.app.tar.gz.sig",
+      "id": 668379134,
+      "bytes": 428,
+      "sha256": "1a459f040fb38fb3b1e780e63858c369a899be5921a131e15aaf54a34e8e1d3e"
+    },
+    {
+      "name": "Zergchat_0.1.20_universal.dmg",
+      "id": 668379133,
+      "bytes": 16795975,
+      "sha256": "5b7ac1d205b2b9d1334949868bf9de835523bfe5eb4f14d03e619c694efe060d"
+    },
+    {
+      "name": "checksums-macos.txt",
+      "id": 668379142,
+      "bytes": 392,
+      "sha256": "522fd3ab3826ec7dc217ec183e9510d333c7911143c99b648812abb42777b064"
+    },
+    {
+      "name": "macos-notarized.txt",
+      "id": 668379140,
+      "bytes": 164,
+      "sha256": "f601933c6b05c0e65305e224d6dc969ec2114581bdf14f480b2559db29bc1271"
+    },
+    {
+      "name": "manual-release-metadata.json",
+      "id": 668379201,
+      "bytes": 1944,
+      "sha256": "bf04e46e1bcd518f450e404b91d4066727ac2677307a75f5c7706561b147de57"
+    }
+  ],
+  "draftAssetsIndependentlyVerified": 6,
+  "anonymousPublicAssetsVerified": 6,
+  "hostedDmg": {
+    "status": "FULL_DOWNLOAD_HASH_VERIFIED",
+    "sha256": "5b7ac1d205b2b9d1334949868bf9de835523bfe5eb4f14d03e619c694efe060d",
+    "bytes": 16795975,
+    "assetId": 668379133,
+    "downloadUrl": "https://zergchat.com/api/native/download/668379133/Zergchat_0.1.20_universal.dmg"
+  },
+  "updaterChecks": [
+    {
+      "platform": "darwin",
+      "arch": "aarch64",
+      "from": "0.1.18",
+      "status": 200,
+      "version": "0.1.20"
+    },
+    {
+      "platform": "darwin",
+      "arch": "aarch64",
+      "from": "0.1.20",
+      "status": 204,
+      "version": null
+    },
+    {
+      "platform": "darwin",
+      "arch": "x86_64",
+      "from": "0.1.18",
+      "status": 200,
+      "version": "0.1.20"
+    },
+    {
+      "platform": "darwin",
+      "arch": "x86_64",
+      "from": "0.1.20",
+      "status": 204,
+      "version": null
+    },
+    {
+      "platform": "windows",
+      "arch": "x86_64",
+      "from": "0.1.9",
+      "status": 200,
+      "version": "0.1.10"
+    },
+    {
+      "platform": "windows",
+      "arch": "x86_64",
+      "from": "0.1.10",
+      "status": 204,
+      "version": null
+    },
+    {
+      "platform": "linux",
+      "arch": "x86_64",
+      "from": "0.1.9",
+      "status": 200,
+      "version": "0.1.10"
+    },
+    {
+      "platform": "linux",
+      "arch": "x86_64",
+      "from": "0.1.10",
+      "status": 204,
+      "version": null
+    }
+  ],
+  "actualUpdate": {
+    "from": "0.1.18",
+    "to": "0.1.20",
+    "ordinaryRestartAction": true,
+    "automaticRestartBeforeManualLaunch": true,
+    "nativeBinarySha256": "a4d135a9a1e89bae961831c8f2123c56c11fb473b629af10056760eacb903558",
+    "signedAndStapled": true,
+    "signedInAfterRestart": true,
+    "openPaneCountBefore": 1,
+    "openPaneCountAfter": 1,
+    "sameOpenPanes": true,
+    "aboutVersionBefore": "0.1.18",
+    "aboutVersionAfter": "0.1.20",
+    "staleUpdateOfferAbsent": true,
+    "staleRouterSignInBodyAbsent": true,
+    "singleExplicitRouterRetryVisible": true,
+    "routerAccountConnectedInProfile": true,
+    "sourceGroupsVisible": true,
+    "slackMirrorVisible": true,
+    "personalChatsBelowSharedFiles": true,
+    "activeBotDirectoryCount": 4,
+    "importedNoninteractiveSlackBotsAbsent": true,
+    "newRealRouterGrantsMade": 0,
+    "realMessagesSent": 0,
+    "actualConsentApprovalClaimed": false,
+    "newConnectionDialogOpened": false,
+    "storageIsolation": "Separate signed trial app uses the existing authenticated OS application/profile state; profile is not isolated.",
+    "installedAppUpdateActionNotInvoked": true,
+    "consentObservationLimit": "Already connected account; no sign-out or new real grant was performed. Synthetic consent and the real native public-frame READY handshake were verified separately."
+  },
+  "hostedRuntime": {
+    "sourceSha": "bcfa5885fd1c8174870b282a997cbce12a3284c3",
+    "healthy": true,
+    "schemaVersion": 27,
+    "boundedColdResumeHotfixIncluded": true,
+    "existingQuestionRetriedThroughNativeUI": true,
+    "actualAssistantAnswerVisible": true,
+    "sameStoredReplyUpdated": true,
+    "originalTriggerPreserved": true,
+    "failureFlagsCleared": true,
+    "historyCleared": false,
+    "newMessageCreatedByOperator": false
+  },
+  "nativeFramePolicyQualification": {
+    "authTestsPassed": 16,
+    "newStrictUrlTestsIncluded": 3,
+    "realWebKitCallbackModesPassed": 2,
+    "publicRouterReadyHandshakeVerified": true,
+    "realApprovalCapabilityUsed": false,
+    "initialRemoteConsentWindowDenied": true,
+    "remoteNativeSessionAccessDeniedByPolicy": true,
+    "mutantsExecutedUnique": 27,
+    "mutantsKilled": 25,
+    "reviewedEquivalentSurvivors": 2,
+    "timeouts": 0,
+    "buildErrors": 0,
+    "equivalentExplanation": "At the successful end of the exact three-pair validation loop all three unique binding flags are true; changing either final AND to OR cannot alter admission.",
+    "scope": "Consent URL policy and both real native navigation callback sites; not a whole-application mutation claim."
+  },
+  "cleanup": {
+    "status": "passed",
+    "ownedTrialStopped": true,
+    "ownedTrialProcessAbsent": true,
+    "installedAppUnchanged": true,
+    "installedVersion": "0.1.17",
+    "installedBinarySha256": "36751e01a968b6e486be5c7761680b4a8ffeb7151e02e75deee68b852c61e03a",
+    "installedHandlerRestored": true,
+    "handlerIndependentlyVerifiedByNSWorkspace": true,
+    "installedAppUpdateActionNotInvoked": true,
+    "realMessagesSent": 0,
+    "realRouterGrantsMade": 0,
+    "sharedExistingOsProfile": true,
+    "isolatedProfileClaimed": false
+  },
+  "rebuiltPlatforms": [
+    "macos-universal"
+  ],
+  "retainedPlatforms": {
+    "windows": "0.1.10",
+    "linux": "0.1.10",
+    "android": "0.1.8"
+  },
+  "unverifiedAcceptance": [
+    "Intel execution",
+    "fresh drag-to-Applications installation",
+    "new Windows package",
+    "new Linux package",
+    "new mobile package",
+    "physical mobile device",
+    "new real Router consent approval"
+  ],
+  "buildAndPublicationMode": "Manual; no GitHub Actions build or release dispatch.",
+  "desktopReleaseWorkflowState": "disabled_manually",
+  "desktopReleaseWorkflowDispatched": false,
+  "superseded019Published": false,
+  "immutableAssetsOrTagsReplaced": false,
+  "evidencePolicy": "Public hashes, counts, booleans and release metadata only; no private paths, process identifiers, account/workspace/member identifiers or conversation content."
+}
