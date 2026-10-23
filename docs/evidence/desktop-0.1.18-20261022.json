@@ -1,0 +1,275 @@
+{
+  "draft": false,
+  "acceptanceStatus": "COMPLETE",
+  "version": "0.1.18",
+  "sourceSha": "f642b8bffc4790f81b5018808e15682683adb1e1",
+  "releaseUrl": "https://github.com/Epoch-ML/zergchat-releases/releases/tag/zergchat-v0.1.18",
+  "releaseUrlStatus": "PUBLIC",
+  "validation": {
+    "totalPassed": 140,
+    "targetedPassed": 140,
+    "fullAppAndViewportPassed": 1,
+    "typecheckPassed": true,
+    "sizingPassed": true,
+    "productionBuildPassed": true,
+    "productionBuildKind": "Nuxt server",
+    "fullApplicationSuiteClaimedGreen": false,
+    "physicalDeviceAcceptance": false,
+    "mutations": {
+      "sourceGroupProjection": {
+        "status": "PASSED_WITH_REVIEWED_EQUIVALENTS",
+        "killed": 215,
+        "survivedEquivalent": 5,
+        "executedUnique": 220,
+        "ignoredStringCopyMutations": 45,
+        "timeouts": 0,
+        "errors": 0,
+        "classification": [
+          "Two opaque GitHub identity key casing equivalents",
+          "One initial hasChildren value overwritten by the final projection",
+          "Two temporary former-folder map guards without observable folder changes"
+        ],
+        "scope": "Source grouping, root ordering, legacy-folder cleanup and source-search branches"
+      },
+      "sidebarUiSemanticDrops": {
+        "killed": 2,
+        "survived": 0,
+        "timeouts": 0,
+        "status": "PASSED"
+      },
+      "workspaceRootMembership": {
+        "status": "PASSED_WITH_REVIEWED_EQUIVALENT",
+        "killed": 60,
+        "survivedEquivalent": 1,
+        "executedUnique": 61,
+        "ignoredStringCopyMutations": 28,
+        "timeouts": 0,
+        "errors": 0,
+        "classification": [
+          "Redundant metadata upsert becomes a dispatcher no-op; the authoritative membership delta still persists the repair."
+        ],
+        "followUpExecutionsDeduplicated": 9,
+        "scope": "Root audience creation, future-human enrollment, privacy opt-out, and durable membership repair."
+      }
+    },
+    "knownBaselineFailures": {
+      "themeChecker": "existing FakeidanBotManager.vue:282 --red token",
+      "themeFailureUnchanged": true,
+      "themeParentSourceSha": "1ba8b1d6d6882180aaba0c94a3e76d01a7b43fe5",
+      "themeParentFailureReproduced": true
+    },
+    "realSlackMessagesSentByCompletedTests": 0,
+    "fullAppIncludedInTargetedTotal": true,
+    "targetedBreakdown": {
+      "server": 79,
+      "sidebar": 43,
+      "sourceGroupProjection": 16,
+      "postgres": 1,
+      "fullApp": 1
+    },
+    "counting": "140 unique target checks; server total includes27 root checks; repeated viewport execution is excluded from the total.",
+    "sizingStyleBearingFiles": 86
+  },
+  "native": {
+    "status": "VERIFIED",
+    "binarySha256": "b249864d6d76336bae31e9c5eebb9d75ac9fd4a77fd89a22dd76a29da83994fc",
+    "updaterPublicKeySha256": "72e69951eb2b25e83adb69fa6da6373e842127cdd6d597b4f95e7572dc60d860",
+    "targetArchitectures": [
+      "arm64",
+      "x86_64"
+    ],
+    "verifiedUniversalArchitectures": [
+      "arm64",
+      "x86_64"
+    ],
+    "appSigningPassed": true,
+    "dmgSigningPassed": true,
+    "exactEntitlementsPassed": true,
+    "appNotarization": "Accepted",
+    "dmgNotarization": "Accepted",
+    "gatekeeperAndStaplePassed": true,
+    "archiveExtractionPassed": true,
+    "stableUpdaterSignaturePassed": true,
+    "testFeaturesEnabled": false
+  },
+  "artifacts": [
+    {
+      "name": "Zergchat_0.1.18_universal.dmg",
+      "sha256": "78484daa2b49ff86ec0edadb954f3a038c6fc30697252b941d8e2abd566a18fa",
+      "bytes": 16832469
+    },
+    {
+      "name": "macos-notarized.txt",
+      "sha256": "819aca406959dc5b7add0176b5bf85f56674126d3f84a73e44cfe019b2a79ab4",
+      "bytes": 164
+    },
+    {
+      "name": "manual-release-metadata.json",
+      "sha256": "57612365859f3940f82cb18d719f3f86192de9d9936a77721c25b11d569d4f22",
+      "bytes": 1944
+    },
+    {
+      "name": "checksums-macos.txt",
+      "sha256": "5497ccdb8487dee73290c370226a7754d602eb14381d7575564e59b14d34f97c",
+      "bytes": 392
+    },
+    {
+      "name": "Zergchat_0.1.18_universal.app.tar.gz.sig",
+      "sha256": "4b7f5a840464cc84dfe34b4af1db43b22a9c5a029290d9a3615b430531ba862a",
+      "bytes": 428
+    },
+    {
+      "name": "Zergchat_0.1.18_universal.app.tar.gz",
+      "sha256": "276acc6136c7b4590ffd4f142a116c35e5f60998544e16046279b5953213069f",
+      "bytes": 15478522
+    }
+  ],
+  "artifactsStatus": "INDEPENDENT_DRAFT_AND_ANONYMOUS_PUBLIC_HASHES_VERIFIED",
+  "draftAssetsIndependentlyVerified": 6,
+  "anonymousPublicAssetsVerified": 6,
+  "hostedDmg": {
+    "status": "FULL_DOWNLOAD_HASH_VERIFIED",
+    "sha256": "78484daa2b49ff86ec0edadb954f3a038c6fc30697252b941d8e2abd566a18fa",
+    "bytes": 16832469,
+    "assetId": 668149567,
+    "downloadsPageVersion": "0.1.18",
+    "downloadUrl": "https://zergchat.com/api/native/download/668149567/Zergchat_0.1.18_universal.dmg",
+    "downloadsPageVisuallyVerified": true
+  },
+  "updaterChecks": [
+    {
+      "platform": "darwin",
+      "arch": "aarch64",
+      "from": "0.1.17",
+      "status": 200,
+      "version": "0.1.18"
+    },
+    {
+      "platform": "darwin",
+      "arch": "aarch64",
+      "from": "0.1.18",
+      "status": 204,
+      "version": null
+    },
+    {
+      "platform": "darwin",
+      "arch": "x86_64",
+      "from": "0.1.17",
+      "status": 200,
+      "version": "0.1.18"
+    },
+    {
+      "platform": "darwin",
+      "arch": "x86_64",
+      "from": "0.1.18",
+      "status": 204,
+      "version": null
+    },
+    {
+      "platform": "windows",
+      "arch": "x86_64",
+      "from": "0.1.9",
+      "status": 200,
+      "version": "0.1.10"
+    },
+    {
+      "platform": "windows",
+      "arch": "x86_64",
+      "from": "0.1.10",
+      "status": 204,
+      "version": null
+    },
+    {
+      "platform": "linux",
+      "arch": "x86_64",
+      "from": "0.1.9",
+      "status": 200,
+      "version": "0.1.10"
+    },
+    {
+      "platform": "linux",
+      "arch": "x86_64",
+      "from": "0.1.10",
+      "status": 204,
+      "version": null
+    }
+  ],
+  "actualUpdate": {
+    "from": "0.1.17",
+    "to": "0.1.18",
+    "sourceSha": "f642b8bffc4790f81b5018808e15682683adb1e1",
+    "ordinaryRestartAction": true,
+    "automaticRestartBeforeManualLaunch": true,
+    "nativeBinarySha256": "b249864d6d76336bae31e9c5eebb9d75ac9fd4a77fd89a22dd76a29da83994fc",
+    "signedAndStapled": true,
+    "signedInAfterRestart": true,
+    "openPaneCountBefore": 1,
+    "openPaneCountAfter": 1,
+    "sameOpenPanes": true,
+    "staleUpdateOfferAbsent": true,
+    "sourceGroupsVisible": true,
+    "slackProviderIconVisuallyVerified": true,
+    "legacyTeamsGroupAbsent": true,
+    "personalChatsBelowSharedFiles": true,
+    "rootCreationDefaultAndAudienceVerified": true,
+    "creationDialogCancelled": true,
+    "realSlackMessagesSent": 0,
+    "storageIsolation": "Separate signed trial application copy; existing authenticated OS application/profile state shared. No isolated profile was used.",
+    "status": "AUTOMATIC_RESTART_VERIFIED"
+  },
+  "web": {
+    "status": "PASSED",
+    "sourceSha": "f642b8bffc4790f81b5018808e15682683adb1e1",
+    "buildVersion": "desktop-0.1.18-f642b8bffc47",
+    "imageDigest": "sha256:5375aa3c93234604c132db0d9f8b0b8cdcb666ddab3369177cc4fafbbc25745d",
+    "healthy": true,
+    "schema": {
+      "ready": true,
+      "appliedVersion": 27,
+      "requiredVersion": 27
+    },
+    "deploymentDelta": "Existing machine config.image only, fenced by recorded machine-version compare-and-swap."
+  },
+  "cleanup": {
+    "status": "VERIFIED",
+    "ownedTrialStopped": true,
+    "installedAppUnchanged": true,
+    "installedVersion": "0.1.17",
+    "installedBinarySha256": "36751e01a968b6e486be5c7761680b4a8ffeb7151e02e75deee68b852c61e03a",
+    "installedHandlerRestored": true,
+    "installedHandlerIndependentlyVerified": true,
+    "stableUpdateAvailableForInstalledVersion": true,
+    "realSlackMessagesSent": 0
+  },
+  "buildMode": "Manual signed/notarized universal macOS and web builds; no GitHub Actions build or release workflow change used.",
+  "rebuiltPlatforms": [
+    "macos"
+  ],
+  "retainedPlatforms": {
+    "windows": "0.1.10",
+    "linux": "0.1.10",
+    "android": "0.1.8"
+  },
+  "unverifiedPlatformAcceptance": [
+    "Intel execution",
+    "new Windows package",
+    "new Linux package",
+    "new mobile package",
+    "physical mobile device",
+    "fresh drag-to-Applications installation"
+  ],
+  "evidencePolicy": "Public hashes, counts, booleans and release metadata only; no private paths, conversation content, member/workspace identifiers or process identifiers.",
+  "featureSummary": {
+    "primary": "Explicit workspace-wide native root chats include current and future active human workspace members.",
+    "privacy": "Existing direct chats, restricted chats and legacy rooms retain their access; moving into a folder or privatizing ends automatic enrollment.",
+    "secondary": [
+      "Provider source groups preserve canonical permissions and paths.",
+      "Shared root files precede shared folders/source groups and personal chats."
+    ]
+  },
+  "publishedAt": "2026-10-23T06:05:21Z",
+  "qualificationTestOnlyFollowUpSha": "23f8970baa8e6434aaae31386b1c9cbbc42c378c",
+  "applicationChangedAfterFrozenSource": false,
+  "desktopReleaseWorkflowState": "disabled_manually",
+  "desktopReleaseWorkflowDispatched": false
+}
